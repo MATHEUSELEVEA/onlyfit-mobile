@@ -2,13 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Tipos estruturais mínimos dos caches que este hook atualiza de forma
-// otimista (evita acoplar creators ↔ feed/explore por import de tipos).
-interface FeedPostLike {
-  author: { id: string };
-  authorFollowedByMe: boolean;
-}
-
+// Tipo estrutural mínimo do cache que este hook atualiza de forma otimista
+// (evita acoplar creators ↔ explore por import de tipos).
 interface ExploreCreatorLike {
   id: string;
   followedByMe: boolean;
@@ -37,8 +32,8 @@ export function useCreatorFollowState(creatorId: string | null | undefined) {
 }
 
 // Seguir/deixar de seguir persistido em `creator_follows` (upsert/delete,
-// como no onlyfit v1), com atualização otimista dos caches de feed,
-// explorar e do estado do perfil do creator.
+// como no onlyfit v1), com atualização otimista dos caches de explorar e
+// do estado do perfil do creator.
 export function useToggleCreatorFollow(creatorId: string | null | undefined) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
@@ -68,21 +63,14 @@ export function useToggleCreatorFollow(creatorId: string | null | undefined) {
     onMutate: async (nextFollowing) => {
       if (!creatorId) return {};
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: ['feed'] }),
         queryClient.cancelQueries({ queryKey: ['explore-creators'] }),
         queryClient.cancelQueries({ queryKey: ['creator-follow', creatorId] }),
       ]);
 
-      const feedSnapshot = queryClient.getQueriesData<FeedPostLike[]>({ queryKey: ['feed'] });
       const exploreSnapshot = queryClient.getQueriesData<ExploreCreatorLike[]>({
         queryKey: ['explore-creators'],
       });
 
-      queryClient.setQueriesData<FeedPostLike[]>({ queryKey: ['feed'] }, (posts) =>
-        posts?.map((post) =>
-          post.author.id === creatorId ? { ...post, authorFollowedByMe: nextFollowing } : post,
-        ),
-      );
       queryClient.setQueriesData<ExploreCreatorLike[]>({ queryKey: ['explore-creators'] }, (creators) =>
         creators?.map((creator) =>
           creator.id === creatorId ? { ...creator, followedByMe: nextFollowing } : creator,
@@ -90,10 +78,9 @@ export function useToggleCreatorFollow(creatorId: string | null | undefined) {
       );
       queryClient.setQueryData(['creator-follow', creatorId, userId], nextFollowing);
 
-      return { feedSnapshot, exploreSnapshot };
+      return { exploreSnapshot };
     },
     onError: (_error, nextFollowing, context) => {
-      context?.feedSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
       context?.exploreSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
       queryClient.setQueryData(['creator-follow', creatorId, userId], !nextFollowing);
     },

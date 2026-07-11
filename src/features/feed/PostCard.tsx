@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   BadgeCheck,
   Bookmark,
-  Check,
   ChevronRight,
   Dumbbell,
   Heart,
@@ -12,7 +11,6 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ShareSheet } from '@/components/ui/ShareSheet';
-import { useToggleCreatorFollow } from '@/features/creators/useCreatorFollow';
 import { formatCount } from '@/lib/format';
 import type { FeedPost } from './types';
 import { PostCaption } from './PostCaption';
@@ -55,26 +53,16 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
-  const navigate = useNavigate();
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
   const toggleLike = useToggleLike();
-  const toggleFollow = useToggleCreatorFollow(post.author.id);
   const { saved, toggleSaved } = useSavedPost(post.id);
 
   const profileTo = `/creator/${encodeURIComponent(post.author.username)}`;
   // Rota de detalhe do post ainda não existe no v2; o link já nasce no
   // formato do v1 (/post/:id) para continuar válido quando ela chegar.
   const shareUrl = `${window.location.origin}/post/${post.id}`;
-
-  function handleSubscribeClick() {
-    // Assinatura passa por checkout (não existe toggle): leva ao perfil do
-    // creator, onde vive o fluxo de assinatura.
-    if (!post.authorSubscribedByMe) {
-      navigate(profileTo, { state: { author: post.author } });
-    }
-  }
 
   return (
     <article className="relative h-full w-full overflow-hidden bg-surface-container-lowest">
@@ -171,38 +159,6 @@ export function PostCard({ post }: PostCardProps) {
                 <BadgeCheck size={18} className="shrink-0 text-primary" aria-label="Verificado" />
               )}
             </Link>
-
-            {/* Assinar (checkout no perfil) + Seguir (persistido) sobre a mídia */}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleSubscribeClick}
-                aria-pressed={post.authorSubscribedByMe}
-                className={clsx(
-                  'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-5 font-sans text-label backdrop-blur-sm transition-all active:scale-95',
-                  post.authorSubscribedByMe
-                    ? 'border border-white/35 bg-white/10 text-white'
-                    : 'bg-primary text-on-primary shadow-md shadow-black/25',
-                )}
-              >
-                {post.authorSubscribedByMe && <Check size={15} strokeWidth={3} aria-hidden />}
-                {post.authorSubscribedByMe ? 'Assinado' : 'Assinar'}
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleFollow.mutate(!post.authorFollowedByMe)}
-                aria-pressed={post.authorFollowedByMe}
-                className={clsx(
-                  'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-5 font-sans text-label backdrop-blur-sm transition-all active:scale-95',
-                  post.authorFollowedByMe
-                    ? 'bg-white/20 text-white'
-                    : 'border border-white/45 bg-white/10 text-white',
-                )}
-              >
-                {post.authorFollowedByMe && <Check size={15} strokeWidth={3} aria-hidden />}
-                {post.authorFollowedByMe ? 'Seguindo' : 'Seguir'}
-              </button>
-            </div>
           </div>
         </div>
 

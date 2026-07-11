@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { isMembershipActive, type MembershipStatusRow } from '@/features/creators/membership';
 import type { FeedPost } from './types';
 
 const PAGE_SIZE = 10;
@@ -26,13 +25,7 @@ interface PostRow {
   } | null;
 }
 
-interface ViewerState {
-  likedPostIds: Set<string>;
-  followedCreatorIds: Set<string>;
-  subscribedCreatorIds: Set<string>;
-}
-
-function toFeedPost(row: PostRow, viewer: ViewerState): FeedPost {
+function toFeedPost(row: PostRow, likedPostIds: Set<string>): FeedPost {
   return {
     id: row.id,
     author: {
@@ -49,58 +42,18 @@ function toFeedPost(row: PostRow, viewer: ViewerState): FeedPost {
     commentCount: row.comments ?? 0,
     createdAt: row.published_at,
     product: null, // banner de produto entra na próxima etapa
-    likedByMe: viewer.likedPostIds.has(row.id),
-    authorFollowedByMe: viewer.followedCreatorIds.has(row.creator_id),
-    authorSubscribedByMe: viewer.subscribedCreatorIds.has(row.creator_id),
+    likedByMe: likedPostIds.has(row.id),
   };
 }
 
-// Estado do usuário sobre os posts/creators da página, em lote (como no v1):
-// curtidas, follows ativos e assinaturas (memberships + fallback legado).
-async function fetchViewerState(
-  userId: string,
-  postIds: string[],
-  creatorIds: string[],
-): Promise<ViewerState> {
-  const [likesResp, followsResp, membershipsResp, legacySubsResp] = await Promise.all([
-    supabase.from('post_likes').select('post_id').eq('user_id', userId).in('post_id', postIds),
-    supabase
-      .from('creator_follows')
-      .select('creator_id')
-      .eq('follower_id', userId)
-      .eq('status', 'active')
-      .in('creator_id', creatorIds),
-    supabase
-      .from('creator_memberships')
-      .select('creator_id, status, current_period_end, grace_until')
-      .eq('user_id', userId)
-      .in('creator_id', creatorIds),
-    supabase
-      .from('subscriptions')
-      .select('creator_id')
-      .eq('subscriber_id', userId)
-      .eq('status', 'active')
-      .in('creator_id', creatorIds),
-  ]);
-
-  const likedPostIds = new Set(
-    ((likesResp.data ?? []) as { post_id: string }[]).map((row) => row.post_id),
-  );
-  const followedCreatorIds = new Set(
-    ((followsResp.data ?? []) as { creator_id: string }[]).map((row) => row.creator_id),
-  );
-
-  const subscribedCreatorIds = new Set<string>();
-  ((membershipsResp.data ?? []) as ({ creator_id: string } & MembershipStatusRow)[]).forEach(
-    (membership) => {
-      if (isMembershipActive(membership)) subscribedCreatorIds.add(membership.creator_id);
-    },
-  );
-  ((legacySubsResp.data ?? []) as { creator_id: string | null }[]).forEach((sub) => {
-    if (sub.creator_id) subscribedCreatorIds.add(sub.creator_id);
-  });
-
-  return { likedPostIds, followedCreatorIds, subscribedCreatorIds };
+async function fetchLikedPostIds(userId: string, postIds: string[]): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('post_likes')
+    .select('post_id')
+    .eq('user_id', userId)
+    .in('post_id', postIds);
+  if (error) throw error;
+  return new Set(((data ?? []) as { post_id: string }[]).map((row) => row.post_id));
 }
 
 async function fetchFeedPosts(userId: string, sports: string[]): Promise<FeedPost[]> {
@@ -131,10 +84,9 @@ async function fetchFeedPosts(userId: string, sports: string[]): Promise<FeedPos
     .map((id) => byId.get(id))
     .filter((row): row is PostRow => Boolean(row));
 
-  const creatorIds = [...new Set(rows.map((row) => row.creator_id))];
-  const viewer = await fetchViewerState(userId, rows.map((row) => row.id), creatorIds);
+  const likedPostIds = await fetchLikedPostIds(userId, rows.map((row) => row.id));
 
-  return rows.map((row) => toFeedPost(row, viewer));
+  return rows.map((row) => toFeedPost(row, likedPostIds));
 }
 
 export function useFeed(sports: string[]) {

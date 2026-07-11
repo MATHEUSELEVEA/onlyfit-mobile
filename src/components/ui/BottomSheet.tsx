@@ -36,7 +36,9 @@ export function BottomSheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50" role="presentation">
+    // z acima da BottomNav (z-50): senão a nav pinta sobre o rodapé do sheet,
+    // escondendo botões e o campo de comentário.
+    <div className="fixed inset-0 z-[60]" role="presentation">
       <button
         type="button"
         onClick={onClose}

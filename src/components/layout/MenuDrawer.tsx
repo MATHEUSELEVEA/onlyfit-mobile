@@ -3,10 +3,7 @@ import {
   Briefcase,
   Building2,
   ChevronRight,
-  Compass,
-  Home,
   ShoppingBag,
-  Sparkles,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -30,18 +27,12 @@ interface MenuSection {
   items: MenuItem[];
 }
 
-const GENERAL_ITEMS: MenuItem[] = [
-  { label: 'Início', icon: Home, to: '/feed' },
-  { label: 'Rotina', icon: Sparkles, to: '/treino' },
-];
-
 const OPERATION_ITEMS: MenuItem[] = [
   { label: 'Gestão', icon: Briefcase, to: null },
   { label: 'Meus negócios', icon: Building2, to: null },
 ];
 
 const PERSONAL_ITEMS: MenuItem[] = [
-  { label: 'Explorar', icon: Compass, to: '/explorar' },
   { label: 'Market', icon: ShoppingBag, to: '/produtos' },
   { label: 'Comunidade', icon: Users, to: null },
 ];
@@ -51,7 +42,6 @@ export function MenuDrawer({ open, onClose, isProfessional = false }: MenuDrawer
   const location = useLocation();
 
   const sections: MenuSection[] = [
-    { title: 'Geral', items: GENERAL_ITEMS },
     ...(isProfessional ? [{ title: 'Operação', items: OPERATION_ITEMS }] : []),
     { title: 'Minha Área', items: PERSONAL_ITEMS },
   ];
@@ -69,7 +59,7 @@ export function MenuDrawer({ open, onClose, isProfessional = false }: MenuDrawer
       description={
         isProfessional
           ? 'Acesso rápido para operação e área pessoal.'
-          : 'Acesso rápido para sua rotina e área pessoal.'
+          : 'Acesso rápido para sua área pessoal.'
       }
     >
       <div className="space-y-5 px-5 pb-6 pt-2">
