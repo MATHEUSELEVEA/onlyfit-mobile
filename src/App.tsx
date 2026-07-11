@@ -5,11 +5,11 @@ import { ThemeProvider } from './theme/ThemeProvider';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AppShell } from './components/layout/AppShell';
 import { FeedPage } from './features/feed/FeedPage';
-import { ExplorePage } from './pages/ExplorePage';
+import { ExplorePage } from './features/explore/ExplorePage';
 import { TrainingPage } from './pages/TrainingPage';
 import { ProductsPage } from './pages/ProductsPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { CreatorProfilePage } from './pages/CreatorProfilePage';
+import { ProfilePage } from './features/profile/ProfilePage';
+import { CreatorProfilePage } from './features/creators/CreatorProfilePage';
 import { LoginPage } from './pages/LoginPage';
 
 const queryClient = new QueryClient({

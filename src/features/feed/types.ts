@@ -21,4 +21,9 @@ export interface FeedPost {
   commentCount: number;
   createdAt: string;
   product: FeedProduct | null;
+  // Estado do usuário logado sobre o post/creator (hidratado no fetch,
+  // atualizado de forma otimista pelas mutações).
+  likedByMe: boolean;
+  authorFollowedByMe: boolean;
+  authorSubscribedByMe: boolean;
 }

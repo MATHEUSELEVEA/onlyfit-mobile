@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BadgeCheck,
   Bookmark,
+  Check,
   ChevronRight,
   Dumbbell,
   Heart,
@@ -10,14 +11,14 @@ import {
   Share2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { ShareSheet } from '@/components/ui/ShareSheet';
+import { useToggleCreatorFollow } from '@/features/creators/useCreatorFollow';
+import { formatCount } from '@/lib/format';
 import type { FeedPost } from './types';
 import { PostCaption } from './PostCaption';
-
-function formatCount(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace('.0', '')}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace('.0', '')}K`;
-  return String(value);
-}
+import { CommentsSheet } from './CommentsSheet';
+import { useToggleLike } from './useToggleLike';
+import { useSavedPost } from './useSavedPost';
 
 interface RailButtonProps {
   label: string;
@@ -32,6 +33,7 @@ function RailButton({ label, count, active, onClick, children }: RailButtonProps
     <button
       type="button"
       aria-label={label}
+      aria-pressed={active}
       onClick={onClick}
       className="group flex min-h-[44px] min-w-[44px] flex-col items-center gap-1 text-white"
     >
@@ -53,14 +55,26 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
-  // Estado otimista local por enquanto; persistência entra na próxima etapa.
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [following, setFollowing] = useState(false);
-  const [subscribed, setSubscribed] = useState(false);
+  const navigate = useNavigate();
+  const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
-  const likeCount = post.likeCount + (liked ? 1 : 0);
+  const toggleLike = useToggleLike();
+  const toggleFollow = useToggleCreatorFollow(post.author.id);
+  const { saved, toggleSaved } = useSavedPost(post.id);
+
   const profileTo = `/creator/${encodeURIComponent(post.author.username)}`;
+  // Rota de detalhe do post ainda não existe no v2; o link já nasce no
+  // formato do v1 (/post/:id) para continuar válido quando ela chegar.
+  const shareUrl = `${window.location.origin}/post/${post.id}`;
+
+  function handleSubscribeClick() {
+    // Assinatura passa por checkout (não existe toggle): leva ao perfil do
+    // creator, onde vive o fluxo de assinatura.
+    if (!post.authorSubscribedByMe) {
+      navigate(profileTo, { state: { author: post.author } });
+    }
+  }
 
   return (
     <article className="relative h-full w-full overflow-hidden bg-surface-container-lowest">
@@ -98,19 +112,23 @@ export function PostCard({ post }: PostCardProps) {
       <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-4">
         <RailButton
           label="Curtir"
-          count={formatCount(likeCount)}
-          active={liked}
-          onClick={() => setLiked((v) => !v)}
+          count={formatCount(post.likeCount)}
+          active={post.likedByMe}
+          onClick={() => toggleLike.mutate({ postId: post.id, liked: post.likedByMe })}
         >
-          <Heart size={26} fill={liked ? 'currentColor' : 'none'} aria-hidden />
+          <Heart size={26} fill={post.likedByMe ? 'currentColor' : 'none'} aria-hidden />
         </RailButton>
-        <RailButton label="Comentar" count={formatCount(post.commentCount)}>
+        <RailButton
+          label="Comentar"
+          count={formatCount(post.commentCount)}
+          onClick={() => setCommentsPostId(post.id)}
+        >
           <MessageCircle size={26} aria-hidden />
         </RailButton>
-        <RailButton label="Salvar" active={saved} onClick={() => setSaved((v) => !v)}>
+        <RailButton label="Salvar" active={saved} onClick={toggleSaved}>
           <Bookmark size={26} fill={saved ? 'currentColor' : 'none'} aria-hidden />
         </RailButton>
-        <RailButton label="Compartilhar">
+        <RailButton label="Compartilhar" onClick={() => setShareOpen(true)}>
           <Share2 size={26} aria-hidden />
         </RailButton>
       </div>
@@ -154,33 +172,35 @@ export function PostCard({ post }: PostCardProps) {
               )}
             </Link>
 
-            {/* Assinar (era PRO) + Seguir (era GRATUITO) — cores por token de tema */}
+            {/* Assinar (checkout no perfil) + Seguir (persistido) sobre a mídia */}
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setSubscribed((v) => !v)}
-                aria-pressed={subscribed}
+                onClick={handleSubscribeClick}
+                aria-pressed={post.authorSubscribedByMe}
                 className={clsx(
-                  'min-h-[34px] rounded-md px-4 font-sans text-label backdrop-blur-sm transition-colors',
-                  subscribed
-                    ? 'border border-white/40 bg-white/10 text-white'
-                    : 'bg-primary text-on-primary',
+                  'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-5 font-sans text-label backdrop-blur-sm transition-all active:scale-95',
+                  post.authorSubscribedByMe
+                    ? 'border border-white/35 bg-white/10 text-white'
+                    : 'bg-primary text-on-primary shadow-md shadow-black/25',
                 )}
               >
-                {subscribed ? 'Assinado' : 'Assinar'}
+                {post.authorSubscribedByMe && <Check size={15} strokeWidth={3} aria-hidden />}
+                {post.authorSubscribedByMe ? 'Assinado' : 'Assinar'}
               </button>
               <button
                 type="button"
-                onClick={() => setFollowing((v) => !v)}
-                aria-pressed={following}
+                onClick={() => toggleFollow.mutate(!post.authorFollowedByMe)}
+                aria-pressed={post.authorFollowedByMe}
                 className={clsx(
-                  'min-h-[34px] rounded-md px-4 font-sans text-label backdrop-blur-sm transition-colors',
-                  following
-                    ? 'bg-white/25 text-white'
-                    : 'border border-white/40 bg-white/10 text-white',
+                  'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-5 font-sans text-label backdrop-blur-sm transition-all active:scale-95',
+                  post.authorFollowedByMe
+                    ? 'bg-white/20 text-white'
+                    : 'border border-white/45 bg-white/10 text-white',
                 )}
               >
-                {following ? 'Seguindo' : 'Seguir'}
+                {post.authorFollowedByMe && <Check size={15} strokeWidth={3} aria-hidden />}
+                {post.authorFollowedByMe ? 'Seguindo' : 'Seguir'}
               </button>
             </div>
           </div>
@@ -201,6 +221,14 @@ export function PostCard({ post }: PostCardProps) {
           </button>
         )}
       </div>
+
+      <CommentsSheet postId={commentsPostId} onClose={() => setCommentsPostId(null)} />
+      <ShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        url={shareUrl}
+        text={`Veja este post de @${post.author.username} no OnlyFit`}
+      />
     </article>
   );
 }

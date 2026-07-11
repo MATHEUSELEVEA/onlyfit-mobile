@@ -42,3 +42,24 @@ Registro leve de decisões de arquitetura (ADR). Cada entrada explica **por que*
 - Contexto: `baseUrl` foi preterido e o TS avisa que deixará de funcionar na 7.0.
 - Decisão: remover `baseUrl` e usar `paths` com caminho relativo (`"@/*": ["./src/*"]`), resolvido em relação ao tsconfig. O alias de runtime já é resolvido pelo Vite (`vite.config.ts`).
 - Consequência: sem warning de deprecação; typecheck e alias `@/` seguem funcionando.
+
+## 0005 — Escritas do cliente restritas a tabelas de interação
+- Data: 2026-07-10
+- Status: aceita
+- Contexto: ao implementar curtir/comentar/seguir/assinar no v2, era preciso definir o que o front pode escrever no banco de produção compartilhado.
+- Decisão: o cliente escreve apenas em `post_likes`, `post_comments` e `creator_follows` (linha do próprio usuário, garantida por RLS). `subscriptions`/`creator_memberships` são somente leitura — "Assinar" leva ao fluxo de checkout (futuro), nunca a um insert do front. Posts salvos ficam em `localStorage` até existir tabela.
+- Consequência: impossível o front "liberar" conteúdo pago por engano; a lista de escritas vive em `docs/DATABASE.md` e cresce só com policy de RLS conferida.
+
+## 0006 — Mutações otimistas com rollback como padrão de escrita
+- Data: 2026-07-10
+- Status: aceita
+- Contexto: feed estilo Reels exige resposta imediata ao toque (curtir/seguir) mesmo com rede lenta.
+- Decisão: toda escrita usa `useMutation` atualizando os caches do React Query em `onMutate` (com snapshot), revertendo em `onError`. Caches de outras features afetadas são atualizados por tipos estruturais mínimos (ex. follow atualiza feed e explorar sem acoplar imports).
+- Consequência: UI instantânea e consistente entre telas; o custo é manter os updaters em sincronia com o shape dos caches (referências: `useToggleLike`, `useCreatorFollow`).
+
+## 0007 — ESLint flat config no repositório
+- Data: 2026-07-10
+- Status: aceita
+- Contexto: `npm run lint` existia no `package.json`, mas o ESLint nunca foi instalado/configurado — o gate de qualidade do CLAUDE.md não rodava.
+- Decisão: adotar ESLint 9+ flat config (`eslint.config.js`) com `typescript-eslint`, `react-hooks` e `react-refresh`, além de `no-console` (permitindo `warn`/`error`).
+- Consequência: `npm run lint` volta a valer como gate real de PR; regras de hooks pegam bugs de dependência em revisão.

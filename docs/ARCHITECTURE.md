@@ -17,11 +17,12 @@ SPA React servida estática pela Netlify. Todo o backend é **Supabase** (Postgr
 
 | Camada | Pasta | Responsabilidade |
 |---|---|---|
-| Páginas/rotas | `src/pages` | Uma tela por rota. Composição, sem regra de negócio pesada. |
-| Features | `src/features/<dominio>` | Domínio vertical (ex. `feed/`): componentes + hooks + tipos + queries daquele domínio, juntos. |
-| UI compartilhada | `src/components` | Layout e widgets reusados entre features (`AppShell`, `BottomNav`, `MenuDrawer`). |
+| Features | `src/features/<dominio>` | Domínio vertical: componentes + hooks + tipos + queries daquele domínio, juntos. Hoje: `feed/`, `explore/`, `creators/`, `profile/`. A página da rota mora na feature (ex. `features/feed/FeedPage`). |
+| Páginas soltas | `src/pages` | Só telas sem domínio próprio ainda (`LoginPage`, placeholders de Treino/Produtos). Ganhou hooks e componentes? Vira feature. |
+| Layout | `src/components/layout` | Casca do app (`AppShell`, `BottomNav`, `MenuDrawer`). |
+| UI compartilhada | `src/components/ui` | Widgets genéricos reusados entre features (`BottomSheet`, `ShareSheet`). Só entra aqui o que 2+ features usam. |
 | Contextos | `src/contexts` | Estado global mínimo (`AuthContext`). |
-| Libs | `src/lib` | Clients e utilitários sem estado (`supabase`). |
+| Libs | `src/lib` | Client e utilitários puros (`supabase`, `sports`, `format`). |
 | Tema | `src/theme` | `ThemeProvider` + `themes.css` (gerado a partir de `docs/temas/`). |
 
 ## Princípios
@@ -31,12 +32,13 @@ SPA React servida estática pela Netlify. Todo o backend é **Supabase** (Postgr
 3. **Supabase é acessado só por `src/lib/supabase.ts`.** Um único client. Features importam esse client, nunca criam outro.
 4. **O banco autoriza.** O front pode esconder um botão por UX, mas quem garante acesso é o RLS. Ver `docs/DATABASE.md` e `docs/SECURITY.md`.
 5. **Tema é dado, não código.** Cor sai de `docs/temas/*.md` → `src/theme/themes.css` → tokens Tailwind. Componente nunca conhece hex. Ver `docs/DESIGN-SYSTEM.md`.
+6. **Escrita é mutação otimista com rollback.** Toda escrita (curtir, seguir, comentar) é um `useMutation` que: atualiza os caches do React Query no `onMutate` (guardando snapshot), desfaz no `onError` e reconcilia no `onSettled`. O usuário nunca espera a rede para ver o toque refletido. Referências: `features/feed/useToggleLike.ts`, `features/creators/useCreatorFollow.ts`.
 
 ## Fluxo de uma leitura (ex.: feed)
 
 1. `FeedPage` chama o hook `useFeed`.
 2. `useFeed` usa React Query para chamar a RPC `feed_home_posts_page(p_limit, p_offset, p_sports)` → ids ordenados.
-3. Hidrata `posts` (+ join `profiles`) para o conteúdo.
+3. Hidrata `posts` (+ join `profiles`) para o conteúdo e, em lote, o estado do usuário (curtidas, follows, assinaturas) — nunca uma query por card.
 4. RLS garante que só posts visíveis ao usuário autenticado voltam.
 5. Componentes consomem o resultado já tipado (`features/feed/types.ts`).
 

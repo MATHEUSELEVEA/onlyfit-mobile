@@ -23,7 +23,7 @@ npm run lint
 
 `.env` tem só chaves públicas (`anon`). Login com conta real — RLS exige usuário autenticado.
 
-## As 6 regras que não se quebram
+## As 7 regras que não se quebram
 
 1. **Nunca cor hardcoded.** Sempre tokens (`bg-surface`, `text-on-surface`, `bg-primary`). O usuário troca de tema em runtime — cor hardcoded quebra isso. Ver `docs/DESIGN-SYSTEM.md`.
 2. **Nunca tamanho de fonte arbitrário** (`text-[13px]`) nem `font-bold` solto. Só tokens (`text-body`, `text-label`…). Tipografia é global e igual nos 3 temas.
@@ -31,21 +31,30 @@ npm run lint
 4. **RLS é a fonte da verdade de acesso**, não o front. Não confie em esconder botão — o banco autoriza. Ver `docs/DATABASE.md` e `docs/SECURITY.md`.
 5. **Simples > esperto.** Não adicione dependência, abstração, camada ou "framework interno" sem necessidade real. Menos código é a meta. Ver `docs/CODING-STANDARDS.md`.
 6. **Sem lixo.** Nada de arquivo morto, `console.log` esquecido, código comentado, `TODO` órfão ou dependência não usada. Se não é usado, apague.
+7. **Cliente nunca escreve em tabela de pagamento.** O front só escreve interações do próprio usuário (`post_likes`, `post_comments`, `creator_follows`). `subscriptions`/`creator_memberships` são somente leitura — assinar é checkout no servidor. Ver `docs/DATABASE.md`.
 
 ## Onde as coisas ficam
 
 ```
 src/
-  components/   UI compartilhada (AppShell, BottomNav, MenuDrawer)
+  components/
+    layout/     casca do app (AppShell, BottomNav, MenuDrawer)
+    ui/         widgets genéricos usados por 2+ features (BottomSheet, ShareSheet)
   contexts/     AuthContext (sessão Supabase)
-  features/     domínios verticais — feed/ (Reels vertical)
-  lib/          clients (supabase)
-  pages/        páginas de rota
+  features/     domínios verticais — página + hooks + tipos juntos
+    feed/       Reels vertical: FeedPage, PostCard, curtir/comentar/salvar
+    explore/    descoberta: ExplorePage (creators + conteúdo + filtros)
+    creators/   perfil público, seguir (persistido) e estado de assinatura
+    profile/    perfil próprio + configurações + sair
+  lib/          client supabase + utilitários puros (sports, format)
+  pages/        só telas sem domínio ainda (Login, placeholders)
   theme/        themes.css (gerado) + ThemeProvider
 docs/           padrões e governança — comece por docs/DOCUMENTATION-INDEX.md
 docs/temas/     specs de cor dos 3 temas (fonte da verdade do design)
 docs/telas/     referências visuais de tela
 ```
+
+Padrão de dados: leitura = hook `useX` com React Query; escrita = `useMutation` com atualização otimista + rollback (`docs/ARCHITECTURE.md`, princípio 6).
 
 ## Antes de dar por pronto
 

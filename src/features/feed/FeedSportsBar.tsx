@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { FEED_SPORTS } from './sports';
+import { FEED_SPORTS } from '@/lib/sports';
 
 interface FeedSportsBarProps {
   selected: string | null;

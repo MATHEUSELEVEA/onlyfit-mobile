@@ -19,9 +19,24 @@ O backend é o **Supabase de produção compartilhado com o OnlyFit v1** (mesmo 
 
 ## Objetos que o app usa hoje
 
+Leitura:
+
 - RPC `feed_home_posts_page(p_limit, p_offset, p_sports)` → ids ordenados do feed.
-- Tabela `posts` (+ join `profiles` via `creator_id`) → conteúdo do post.
-- `post_likes`, `creator_follows`, `subscriptions` → interações (em evolução).
+- `posts` (+ join `profiles` via `creator_id`) → conteúdo do post; posts públicos de creators alimentam o Explorar.
+- `profiles` + `creator_profiles` → identidade, bio, esportes e contadores de creators.
+- `creator_memberships` + `subscriptions` (legada) → estado "Assinado" (**somente leitura** — ver abaixo).
+
+Leitura + escrita (sempre a linha do próprio usuário, garantida por RLS):
+
+- `post_likes` → curtir/descurtir (insert/delete).
+- `post_comments` → comentar (select/insert).
+- `creator_follows` → seguir/deixar de seguir (upsert com `status: 'active'`/delete).
+
+> Posts **salvos** ainda não têm tabela no banco: ficam em `localStorage` por usuário (`useSavedPost`). Quando a tabela existir, só o hook muda.
+
+## Escritas que o cliente NUNCA faz
+
+`subscriptions`, `creator_memberships` e qualquer tabela de pagamento/plano são **somente leitura** no front. Assinar passa por checkout/servidor (ver `docs/ECOSYSTEM.md`); inserir uma "assinatura" direto do cliente seria liberar conteúdo pago sem cobrança. O RLS bloqueia, e o código do app nem tenta.
 
 > Mantenha esta lista curta e verdadeira: registre aqui só o que o app **realmente** consome. O schema completo é do v1.
 

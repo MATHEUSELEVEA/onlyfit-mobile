@@ -56,25 +56,34 @@ Sempre use `font-sans text-{token}` — nunca tamanhos arbitrários (`text-[13px
 
 ```
 src/
-  components/       # UI compartilhada (AppShell, BottomNav, ...)
+  components/
+    layout/         # Casca do app (AppShell, BottomNav, MenuDrawer)
+    ui/             # Widgets genéricos (BottomSheet, ShareSheet)
   contexts/         # AuthContext (sessão Supabase)
   features/
-    feed/           # Tela inicial: feed vertical estilo Reels
-  lib/              # supabase client
-  pages/            # Páginas (Login, Perfil, placeholders)
+    feed/           # Feed vertical estilo Reels + curtir/comentar/salvar
+    explore/        # Descoberta: creators, conteúdo público, filtros
+    creators/       # Perfil público, seguir e estado de assinatura
+    profile/        # Perfil próprio, configurações e sair
+  lib/              # supabase client + utilitários puros (sports, format)
+  pages/            # Só telas sem domínio ainda (Login, placeholders)
   theme/            # themes.css (gerado) + ThemeProvider
 ```
 
-## Dados do feed (mesmo modelo do v1)
+## Dados (mesmo modelo do v1)
 
 - RPC `feed_home_posts_page(p_limit, p_offset, p_sports)` → ids ordenados do feed
 - Tabela `posts` (+ join `profiles` via `creator_id`) → conteúdo
-- `post_likes`, `creator_follows`, `subscriptions` → interações (próximas etapas)
+- `post_likes`, `post_comments`, `creator_follows` → interações (leitura + escrita da própria linha)
+- `creator_memberships` + `subscriptions` → estado "Assinado" (somente leitura; ver `docs/DATABASE.md`)
 
 ## Roadmap curto
 
 - [x] Scaffold + temas + login + feed (leitura)
-- [ ] Curtir/salvar persistidos, seguir/assinar reais
+- [x] Curtir/comentar persistidos, seguir real, compartilhar (link/WhatsApp/Instagram)
+- [x] Explorar (creators + conteúdo + grupos de afinidade)
+- [ ] Salvos no banco (hoje: localStorage)
+- [ ] Checkout de assinatura no app
 - [ ] Banner de produto no post (venda)
-- [ ] Explorar, Treino, Produtos, Perfil completo
+- [ ] Treino, Produtos, conteúdos no perfil do creator
 - [ ] Capacitor (iOS/Android) quando a base web estabilizar

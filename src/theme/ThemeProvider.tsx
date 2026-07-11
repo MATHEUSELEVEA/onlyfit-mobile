@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
+// eslint-disable-next-line react-refresh/only-export-components -- tokens do tema vivem junto do provider
 export const THEMES = [
   { id: 'preto', label: 'Preto — Premium Performance' },
   { id: 'azul', label: 'Azul — Aura Precision' },

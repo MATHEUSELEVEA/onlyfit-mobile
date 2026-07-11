@@ -15,6 +15,12 @@ O app é um SPA público falando direto com o Supabase. **Trate tudo que vai pro
 - Todo acesso a conteúdo pago (assinatura, produto comprado) é verificado no banco. Não implemente "liberação" checando algo só no cliente.
 - Toda tabela nova nasce com RLS **ligado** e policy explícita. Sem policy = ninguém acessa (o correto), não "todo mundo acessa". Ver `docs/DATABASE.md`.
 
+## Escritas do cliente
+
+- O front só escreve em tabelas de **interação do próprio usuário**: `post_likes`, `post_comments`, `creator_follows` (RLS restringe à própria linha). A lista viva está em `docs/DATABASE.md`.
+- Tabelas de **pagamento/acesso pago** (`subscriptions`, `creator_memberships`, planos) são somente leitura no cliente. "Assinar" nunca é um insert do front — é um fluxo de checkout no servidor. Estado de assinatura apenas **reflete** o banco.
+- Mutação nova no front? Confirme a policy de RLS correspondente antes de escrever o código, e registre a tabela em `docs/DATABASE.md`.
+
 ## Autenticação
 
 - Sessão via Supabase Auth (`persistSession` + `autoRefreshToken`), guardada pelo SDK. Não reimplemente storage de token.
