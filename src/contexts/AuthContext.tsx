@@ -7,6 +7,16 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { buildEmailConfirmRedirectUrl, normalizeEmail } from '@/lib/auth';
+
+/** Metadados enviados no cadastro para o trigger de perfil (igual v1). */
+export interface SignUpMetadata {
+  full_name?: string;
+  username?: string;
+  country_code?: string;
+  tax_id?: string;
+  language?: string;
+}
 
 interface AuthContextValue {
   session: Session | null;
@@ -15,8 +25,11 @@ interface AuthContextValue {
   signUp: (
     email: string,
     password: string,
+    metadata?: SignUpMetadata,
+    redirectTo?: string,
   ) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -26,6 +39,7 @@ const AuthContext = createContext<AuthContextValue>({
   signIn: async () => ({ error: 'AuthProvider ausente' }),
   signUp: async () => ({ error: 'AuthProvider ausente', needsConfirmation: false }),
   resetPassword: async () => ({ error: 'AuthProvider ausente' }),
+  updatePassword: async () => ({ error: 'AuthProvider ausente' }),
   signOut: async () => {},
 });
 
@@ -51,8 +65,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error ? error.message : null };
   }
 
-  async function signUp(email: string, password: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+  async function signUp(
+    email: string,
+    password: string,
+    metadata?: SignUpMetadata,
+    redirectTo = '/feed',
+  ) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: buildEmailConfirmRedirectUrl(redirectTo),
+        // O trigger `sync_profile_contacts_from_auth_user` popula o perfil
+        // a partir destes campos (username, full_name, country_code, language).
+        data: metadata,
+      },
+    });
     return {
       error: error ? error.message : null,
       // Sem sessão imediata => o projeto exige confirmação de e-mail.
@@ -60,10 +88,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }
 
+  /**
+   * Envio do link de recuperação via edge function `send-password-reset`
+   * (Admin API + Resend), exatamente como o v1 — o método nativo
+   * `resetPasswordForEmail` foi abandonado lá por cair em filtro de spam.
+   */
   async function resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/`,
+    const normalized = normalizeEmail(email);
+    const { data, error } = await supabase.functions.invoke('send-password-reset', {
+      body: { email: normalized },
     });
+
+    const nested = (data as { error?: string } | null)?.error;
+    if (error || nested) {
+      let msg = 'Erro ao enviar e-mail. Tente novamente mais tarde.';
+      if (error) {
+        try {
+          const bodyErr = (error as { context?: { json?: () => Promise<{ error?: string }> } })
+            ?.context?.json;
+          const parsed = bodyErr ? await bodyErr() : {};
+          msg = parsed?.error || (error as Error).message || msg;
+        } catch {
+          msg = (error as Error).message || msg;
+        }
+      } else if (nested) {
+        msg = nested;
+      }
+      return { error: msg };
+    }
+
+    return { error: null };
+  }
+
+  /** Define a nova senha do usuário na sessão de recuperação ativa. */
+  async function updatePassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password });
     return { error: error ? error.message : null };
   }
 
@@ -73,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, loading, signIn, signUp, resetPassword, signOut }}
+      value={{ session, loading, signIn, signUp, resetPassword, updatePassword, signOut }}
     >
       {children}
     </AuthContext.Provider>

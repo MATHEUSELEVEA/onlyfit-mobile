@@ -1,7 +1,25 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Gift,
+  Globe,
+  IdCard,
+  Loader2,
+  Lock,
+  Mail,
+  User,
+  XCircle,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BackgroundSlideshow } from '@/components/BackgroundSlideshow';
+import { normalizeEmail } from '@/lib/auth';
+import { formatCpf, isValidCpf, normalizeCpf } from '@/lib/cpf';
+import { checkUsernameAvailability, normalizeOnboardingUsername } from '@/lib/username';
+import { COUNTRY_OPTIONS, countryName, detectCountryCode } from '@/lib/countries';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { supabase } from '@/lib/supabase';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -23,17 +41,63 @@ const COPY: Record<Mode, { title: string; subtitle: string; cta: string }> = {
   },
 };
 
+/** Permite deep-link direto para uma aba (`#signup`, `#forgot`), como no v1. */
+function initialMode(): Mode {
+  if (typeof window === 'undefined') return 'signin';
+  const hash = window.location.hash.replace('#', '');
+  return hash === 'signup' || hash === 'forgot' ? hash : 'signin';
+}
+
 export function LoginPage() {
   const { signIn, signUp, resetPassword } = useAuth();
-  const [mode, setMode] = useState<Mode>('signin');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Campos exclusivos do cadastro (paridade com o Signup do v1).
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [countryCode, setCountryCode] = useState(detectCountryCode);
+  const [cpf, setCpf] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const copy = COPY[mode];
+  const requiresCpf = countryCode === 'BR';
+  const debouncedUsername = useDebouncedValue(username, 500);
+
+  // Checagem de disponibilidade de username enquanto o usuário digita.
+  // O reset para `null` acontece no onChange; aqui só a consulta assíncrona.
+  useEffect(() => {
+    if (mode !== 'signup') return;
+    const clean = normalizeOnboardingUsername(debouncedUsername);
+    if (clean.length < 3) return;
+    let cancelled = false;
+    checkUsernameAvailability(clean)
+      .then((available) => {
+        if (!cancelled) {
+          setUsernameAvailable(available);
+          setCheckingUsername(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCheckingUsername(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedUsername, mode]);
+
+  const countries = useMemo(
+    () => COUNTRY_OPTIONS.map((c) => ({ ...c, name: countryName(c.code) })),
+    [],
+  );
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -43,24 +107,78 @@ export function LoginPage() {
     setShowPassword(false);
   }
 
+  async function handleSignUp(trimmedEmail: string) {
+    const cpfDigits = normalizeCpf(cpf);
+    if (requiresCpf && cpfDigits.length === 0) {
+      setError('Informe seu CPF.');
+      return;
+    }
+    if (requiresCpf && !isValidCpf(cpfDigits)) {
+      setError('CPF inválido. Verifique os dígitos.');
+      return;
+    }
+
+    const cleanUsername = normalizeOnboardingUsername(username);
+    if (cleanUsername.length < 3) {
+      setError('O nome de usuário precisa ter ao menos 3 caracteres.');
+      return;
+    }
+    const usernameFree = await checkUsernameAvailability(cleanUsername);
+    if (!usernameFree) {
+      setError('Esse nome de usuário já está em uso.');
+      return;
+    }
+
+    const { error: signUpError, needsConfirmation } = await signUp(trimmedEmail, password, {
+      full_name: fullName.trim(),
+      username: cleanUsername,
+      country_code: countryCode,
+      tax_id: requiresCpf ? cpfDigits : undefined,
+      language: 'pt-BR',
+    });
+
+    if (signUpError) {
+      const lower = signUpError.toLowerCase();
+      if (lower.includes('already') || lower.includes('exists') || lower.includes('registered')) {
+        setError('Este e-mail já possui cadastro. Faça login ou recupere o acesso.');
+      } else {
+        setError('Não foi possível criar a conta. Tente outro email.');
+      }
+      return;
+    }
+
+    // Aplica o código de indicação, se informado (idêntico ao v1).
+    if (referralCode.trim()) {
+      const { data: refResult } = await supabase.rpc('apply_referral_code', {
+        p_code: referralCode.trim(),
+      });
+      const referralError =
+        refResult && typeof refResult === 'object' && !Array.isArray(refResult) && 'error' in refResult
+          ? String((refResult as { error?: unknown }).error ?? '')
+          : '';
+      if (referralError) {
+        setNotice(`Conta criada, mas o código de indicação não pôde ser aplicado: ${referralError}`);
+      }
+    }
+
+    if (needsConfirmation) {
+      setNotice('Conta criada! Confira seu email para confirmar o acesso.');
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
     setNotice(null);
 
-    const trimmedEmail = email.trim();
+    const trimmedEmail = normalizeEmail(email);
 
     if (mode === 'signin') {
       const { error: signInError } = await signIn(trimmedEmail, password);
       if (signInError) setError('Email ou senha inválidos.');
     } else if (mode === 'signup') {
-      const { error: signUpError, needsConfirmation } = await signUp(trimmedEmail, password);
-      if (signUpError) {
-        setError('Não foi possível criar a conta. Tente outro email.');
-      } else if (needsConfirmation) {
-        setNotice('Conta criada! Confira seu email para confirmar o acesso.');
-      }
+      await handleSignUp(trimmedEmail);
     } else {
       const { error: resetError } = await resetPassword(trimmedEmail);
       if (resetError) {
@@ -97,6 +215,78 @@ export function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+              {mode === 'signup' && (
+                <Field icon={<User size={18} />} label="Nome completo">
+                  <input
+                    type="text"
+                    autoComplete="name"
+                    required
+                    placeholder="Seu nome"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full bg-transparent font-sans text-body text-white placeholder:text-white/35 outline-none"
+                  />
+                </Field>
+              )}
+
+              {mode === 'signup' && (
+                <Field icon={<Globe size={18} />} label="País">
+                  <select
+                    required
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="w-full bg-transparent font-sans text-body text-white outline-none [&>option]:text-black"
+                  >
+                    {countries.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.name} ({c.displayCode ?? c.code})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+
+              {mode === 'signup' && requiresCpf && (
+                <Field icon={<IdCard size={18} />} label="CPF">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    required
+                    placeholder="000.000.000-00"
+                    value={formatCpf(cpf)}
+                    onChange={(e) => setCpf(normalizeCpf(e.target.value))}
+                    className="w-full bg-transparent font-sans text-body text-white placeholder:text-white/35 outline-none"
+                  />
+                </Field>
+              )}
+
+              {mode === 'signup' && (
+                <Field icon={<User size={18} />} label="Nome de usuário">
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    required
+                    placeholder="usuario"
+                    value={username}
+                    onChange={(e) => {
+                      const clean = normalizeOnboardingUsername(e.target.value);
+                      setUsername(clean);
+                      setUsernameAvailable(null);
+                      setCheckingUsername(clean.length >= 3);
+                    }}
+                    className="w-full bg-transparent font-sans text-body text-white placeholder:text-white/35 outline-none"
+                  />
+                  {checkingUsername ? (
+                    <Loader2 size={16} className="ml-2 shrink-0 animate-spin text-white/50" aria-hidden />
+                  ) : usernameAvailable === true ? (
+                    <CheckCircle2 size={16} className="ml-2 shrink-0 text-primary" aria-hidden />
+                  ) : usernameAvailable === false ? (
+                    <XCircle size={16} className="ml-2 shrink-0 text-error" aria-hidden />
+                  ) : null}
+                </Field>
+              )}
+
               <Field icon={<Mail size={18} />} label="Email">
                 <input
                   type="email"
@@ -133,6 +323,19 @@ export function LoginPage() {
                 </Field>
               )}
 
+              {mode === 'signup' && (
+                <Field icon={<Gift size={18} />} label="Código de indicação (opcional)">
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    placeholder="Código de indicação (opcional)"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value)}
+                    className="w-full bg-transparent font-sans text-body text-white placeholder:text-white/35 outline-none"
+                  />
+                </Field>
+              )}
+
               {mode === 'signin' && (
                 <button
                   type="button"
@@ -156,7 +359,7 @@ export function LoginPage() {
 
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || (mode === 'signup' && usernameAvailable === false)}
                 className="mt-2 flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-primary font-sans text-label text-on-primary shadow-lg shadow-primary/25 transition-all active:scale-[0.98] disabled:opacity-60"
               >
                 {submitting && <Loader2 size={18} className="animate-spin" aria-hidden />}

@@ -14,6 +14,8 @@ import { MyProductsPage } from './features/market/MyProductsPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { CreatorProfilePage } from './features/creators/CreatorProfilePage';
 import { LoginPage } from './pages/LoginPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { AuthConfirmPage } from './pages/AuthConfirmPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,24 +37,30 @@ function AuthenticatedApp() {
     );
   }
 
-  if (!session) return <LoginPage />;
-
   return (
     <Routes>
-      <Route element={<AppShell />}>
-        <Route path="/" element={<Navigate to="/feed" replace />} />
-        <Route path="/feed" element={<FeedPage />} />
-        <Route path="/explorar" element={<ExplorePage />} />
-        <Route path="/treino" element={<TrainingPage />} />
-        <Route path="/produtos" element={<MyProductsPage />} />
-        <Route path="/mercado" element={<MarketPage />} />
-        <Route path="/market" element={<Navigate to="/mercado" replace />} />
-        <Route path="/comunidades" element={<CommunitiesPage />} />
-        <Route path="/desafios" element={<ChallengesPage />} />
-        <Route path="/perfil" element={<ProfilePage />} />
-        <Route path="/creator/:username" element={<CreatorProfilePage />} />
-        <Route path="*" element={<Navigate to="/feed" replace />} />
-      </Route>
+      {/* Rotas públicas de auth — abertas com ou sem sessão (links de e-mail). */}
+      <Route path="/auth/confirm" element={<AuthConfirmPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      {session ? (
+        <Route element={<AppShell />}>
+          <Route path="/" element={<Navigate to="/feed" replace />} />
+          <Route path="/feed" element={<FeedPage />} />
+          <Route path="/explorar" element={<ExplorePage />} />
+          <Route path="/treino" element={<TrainingPage />} />
+          <Route path="/produtos" element={<MyProductsPage />} />
+          <Route path="/mercado" element={<MarketPage />} />
+          <Route path="/market" element={<Navigate to="/mercado" replace />} />
+          <Route path="/comunidades" element={<CommunitiesPage />} />
+          <Route path="/desafios" element={<ChallengesPage />} />
+          <Route path="/perfil" element={<ProfilePage />} />
+          <Route path="/creator/:username" element={<CreatorProfilePage />} />
+          <Route path="*" element={<Navigate to="/feed" replace />} />
+        </Route>
+      ) : (
+        <Route path="*" element={<LoginPage />} />
+      )}
     </Routes>
   );
 }
