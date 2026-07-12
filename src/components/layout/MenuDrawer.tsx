@@ -4,6 +4,7 @@ import {
   Building2,
   ChevronRight,
   ShoppingBag,
+  Trophy,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -34,7 +35,8 @@ const OPERATION_ITEMS: MenuItem[] = [
 
 const PERSONAL_ITEMS: MenuItem[] = [
   { label: 'Mercado', icon: ShoppingBag, to: '/mercado' },
-  { label: 'Comunidade', icon: Users, to: null },
+  { label: 'Comunidade', icon: Users, to: '/comunidades' },
+  { label: 'Desafios', icon: Trophy, to: '/desafios' },
 ];
 
 export function MenuDrawer({ open, onClose, isProfessional = false }: MenuDrawerProps) {

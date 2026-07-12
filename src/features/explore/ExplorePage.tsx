@@ -246,6 +246,18 @@ export function ExplorePage() {
               {label}
             </FilterChip>
           ))}
+          <Link
+            to="/comunidades"
+            className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full border border-outline-variant/50 bg-surface px-4 py-2 font-sans text-label text-on-surface-variant"
+          >
+            Comunidades
+          </Link>
+          <Link
+            to="/desafios"
+            className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full border border-outline-variant/50 bg-surface px-4 py-2 font-sans text-label text-on-surface-variant"
+          >
+            Desafios
+          </Link>
         </div>
 
         {/* Filtros por grupo de afinidade */}

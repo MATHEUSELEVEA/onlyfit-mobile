@@ -7,6 +7,8 @@ import { AppShell } from './components/layout/AppShell';
 import { FeedPage } from './features/feed/FeedPage';
 import { ExplorePage } from './features/explore/ExplorePage';
 import { TrainingPage } from './pages/TrainingPage';
+import { CommunitiesPage } from './pages/CommunitiesPage';
+import { ChallengesPage } from './pages/ChallengesPage';
 import { MarketPage } from './features/market/MarketPage';
 import { MyProductsPage } from './features/market/MyProductsPage';
 import { ProfilePage } from './features/profile/ProfilePage';
@@ -45,6 +47,8 @@ function AuthenticatedApp() {
         <Route path="/produtos" element={<MyProductsPage />} />
         <Route path="/mercado" element={<MarketPage />} />
         <Route path="/market" element={<Navigate to="/mercado" replace />} />
+        <Route path="/comunidades" element={<CommunitiesPage />} />
+        <Route path="/desafios" element={<ChallengesPage />} />
         <Route path="/perfil" element={<ProfilePage />} />
         <Route path="/creator/:username" element={<CreatorProfilePage />} />
         <Route path="*" element={<Navigate to="/feed" replace />} />

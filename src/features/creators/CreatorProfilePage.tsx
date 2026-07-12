@@ -364,13 +364,17 @@ function ContentGrid({
   return (
     <div className="grid grid-cols-3 gap-1.5">
       {items.map((p) => (
-        <div key={p.id} className="relative aspect-square overflow-hidden rounded-lg bg-surface-container">
+        <Link
+          key={p.id}
+          to={`/feed?post=${encodeURIComponent(p.id)}`}
+          className="relative aspect-square overflow-hidden rounded-lg bg-surface-container"
+        >
           <Thumb url={p.thumbnailUrl} label={p.title ?? 'Conteúdo'} icon={Play} />
           <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-4">
             <Heart size={12} className="text-white" fill="currentColor" aria-hidden />
             <span className="font-sans text-counter text-white">{formatCount(p.likes)}</span>
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   );
