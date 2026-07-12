@@ -24,7 +24,7 @@ Leitura:
 - RPC `feed_home_posts_page(p_limit, p_offset, p_sports)` → ids ordenados do feed.
 - RPC `feed_home_available_sports()` → grupos com ao menos um post elegível no feed do usuário.
 - `posts` (+ join `profiles` via `creator_id`) → conteúdo do post; posts públicos de creators alimentam o Explorar.
-- `profiles` + `creator_profiles` → identidade, bio, esportes e contadores de creators.
+- `profiles` + `creator_profiles` → identidade, bio, esportes (`sports`, fonte única de modalidade/afinidade — ver `docs/DECISIONS.md` #0008; `category` existe no schema do v1 mas não é lida pelo app) e contadores de creators.
 - `creator_memberships` + `subscriptions` (legada) → estado "Assinado" (**somente leitura** — ver abaixo).
 
 Leitura + escrita (sempre a linha do próprio usuário, garantida por RLS):

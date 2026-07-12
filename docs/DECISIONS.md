@@ -63,3 +63,10 @@ Registro leve de decisões de arquitetura (ADR). Cada entrada explica **por que*
 - Contexto: `npm run lint` existia no `package.json`, mas o ESLint nunca foi instalado/configurado — o gate de qualidade do CLAUDE.md não rodava.
 - Decisão: adotar ESLint 9+ flat config (`eslint.config.js`) com `typescript-eslint`, `react-hooks` e `react-refresh`, além de `no-console` (permitindo `warn`/`error`).
 - Consequência: `npm run lint` volta a valer como gate real de PR; regras de hooks pegam bugs de dependência em revisão.
+
+## 0008 — `creator_profiles.sports` como única fonte de afinidade/modalidade; `category` sai do app
+- Data: 2026-07-12
+- Status: aceita
+- Contexto: `creator_profiles.category` é texto livre do v1, sem taxonomia fixa (ex.: "HIPERTROFIA" em um creator de lutas), e estava exposto de duas formas conflitantes: como badge no perfil público (`CreatorProfilePage`) e como critério de afinidade na RPC `feed_home_available_sports` (agrupava creators pela mesma `category`). Isso gerava badges enganosos e um algoritmo de recomendação paralelo ao filtro real de esporte.
+- Decisão: o app passa a considerar sempre `creator_profiles.sports` (taxonomia fixa de `src/lib/sports.ts`) tanto para exibição quanto para afinidade. O badge do perfil agora renderiza `sports` (via `sportLabel`), não mais `category`. A RPC `feed_home_available_sports` (migration `20260712150000_feed_affinity_by_sports.sql`) troca o agrupamento por `cp.category = cp.category` por interseção de array `cp.sports && preference.sports`, calculado a partir dos esportes dos creators que o usuário já seguiu/curtiu/assistiu. A coluna `creator_profiles.category` continua existindo no banco (é do schema do v1) mas nenhum código do onlyfit v2 lê ou escreve nela a partir de agora.
+- Consequência: um único domínio (`sports`) rege filtro, exibição e recomendação — sem mais divergência entre o que o perfil mostra e o que o feed filtra. Se `category` precisar voltar a significar algo (ex. "especialidade comercial" distinta de modalidade), é uma decisão nova, com UI própria, não uma reintrodução silenciosa no fluxo atual.

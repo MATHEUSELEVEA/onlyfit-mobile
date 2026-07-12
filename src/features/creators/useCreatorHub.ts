@@ -13,7 +13,7 @@ export interface CreatorInfo {
   avatarUrl: string | null;
   verified: boolean;
   bio: string | null;
-  category: string | null;
+  sports: string[];
   subscriptionPrice: number;
   followerCount: number;
   subscriberCount: number;
@@ -21,7 +21,7 @@ export interface CreatorInfo {
 
 interface CreatorProfileRow {
   bio: string | null;
-  category: string | null;
+  sports: string[] | null;
   subscription_price: number | null;
   follower_count: number | null;
   subscriber_count: number | null;
@@ -44,7 +44,7 @@ export function useCreatorInfo(username: string | undefined) {
         .from('profiles')
         .select(
           `id, username, full_name, avatar_url,
-           creator_profiles ( bio, category, subscription_price, follower_count, subscriber_count, verified )`,
+           creator_profiles ( bio, sports, subscription_price, follower_count, subscriber_count, verified )`,
         )
         .eq('username', username!)
         .maybeSingle();
@@ -59,7 +59,7 @@ export function useCreatorInfo(username: string | undefined) {
         avatarUrl: data.avatar_url ?? null,
         verified: cp?.verified === true,
         bio: cp?.bio ?? null,
-        category: cp?.category ?? null,
+        sports: cp?.sports ?? [],
         subscriptionPrice: cp?.subscription_price ?? 0,
         followerCount: cp?.follower_count ?? 0,
         subscriberCount: cp?.subscriber_count ?? 0,
@@ -156,7 +156,7 @@ export function useCreatorChallenges(creatorId: string | null | undefined) {
         .from('challenge_runs')
         .select('id, name, description, cover_image_url, entry_price, participant_count, status, created_at')
         .eq('creator_id', creatorId!)
-        .in('status', ['active', 'upcoming', 'published', 'open'])
+        .in('status', ['active', 'scheduled'])
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []).map((c) => ({

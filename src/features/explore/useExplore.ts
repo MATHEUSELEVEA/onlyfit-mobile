@@ -143,3 +143,120 @@ export function useExploreContent() {
     },
   });
 }
+
+export interface ExploreCommunity {
+  id: string;
+  name: string;
+  description: string | null;
+  memberCount: number;
+  creatorId: string;
+  creatorName: string;
+  creatorUsername: string | null;
+}
+
+interface CommunityRow {
+  id: string;
+  name: string | null;
+  description: string | null;
+  member_count: number | null;
+  creator_id: string;
+  profiles:
+    | { full_name: string | null; username: string | null }
+    | { full_name: string | null; username: string | null }[]
+    | null;
+}
+
+// Comunidades para descoberta, mesmo padrão do useCreatorCommunities (hub do
+// criador) mas sem filtrar por creator_id — vitrine com todas as comunidades.
+export function useExploreCommunities() {
+  return useQuery({
+    queryKey: ['explore-communities'],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<ExploreCommunity[]> => {
+      const { data, error } = await supabase
+        .from('communities')
+        .select(
+          `id, name, description, member_count, creator_id,
+           profiles:creator_id (full_name, username)`,
+        )
+        .order('member_count', { ascending: false })
+        .limit(24);
+      if (error) throw error;
+
+      return ((data ?? []) as unknown as CommunityRow[]).map((row) => {
+        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        return {
+          id: row.id,
+          name: row.name || 'Comunidade',
+          description: row.description ?? null,
+          memberCount: row.member_count ?? 0,
+          creatorId: row.creator_id,
+          creatorName: profile?.full_name || profile?.username || 'Creator',
+          creatorUsername: profile?.username ?? null,
+        };
+      });
+    },
+  });
+}
+
+export interface ExploreChallenge {
+  id: string;
+  name: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  price: number;
+  participantCount: number;
+  creatorId: string;
+  creatorName: string;
+  creatorUsername: string | null;
+}
+
+interface ChallengeRow {
+  id: string;
+  name: string | null;
+  description: string | null;
+  cover_image_url: string | null;
+  entry_price: number | null;
+  participant_count: number | null;
+  creator_id: string;
+  profiles:
+    | { full_name: string | null; username: string | null }
+    | { full_name: string | null; username: string | null }[]
+    | null;
+}
+
+// Desafios para descoberta, mesmo padrão do useCreatorChallenges (hub do
+// criador) mas sem filtrar por creator_id — vitrine com todos os desafios.
+export function useExploreChallenges() {
+  return useQuery({
+    queryKey: ['explore-challenges'],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<ExploreChallenge[]> => {
+      const { data, error } = await supabase
+        .from('challenge_runs')
+        .select(
+          `id, name, description, cover_image_url, entry_price, participant_count, creator_id, status,
+           profiles:creator_id (full_name, username)`,
+        )
+        .in('status', ['active', 'scheduled'])
+        .order('created_at', { ascending: false })
+        .limit(24);
+      if (error) throw error;
+
+      return ((data ?? []) as unknown as ChallengeRow[]).map((row) => {
+        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        return {
+          id: row.id,
+          name: row.name || 'Desafio',
+          description: row.description ?? null,
+          coverImageUrl: row.cover_image_url,
+          price: row.entry_price ?? 0,
+          participantCount: row.participant_count ?? 0,
+          creatorId: row.creator_id,
+          creatorName: profile?.full_name || profile?.username || 'Creator',
+          creatorUsername: profile?.username ?? null,
+        };
+      });
+    },
+  });
+}

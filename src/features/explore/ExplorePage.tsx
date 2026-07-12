@@ -1,27 +1,43 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Heart, Loader2, Play, Search } from 'lucide-react';
+import {
+  Check,
+  Heart,
+  Loader2,
+  Play,
+  Search,
+  SlidersHorizontal,
+  Trophy,
+  UsersRound,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import { FEED_SPORTS, sportLabel } from '@/lib/sports';
 import { formatCount } from '@/lib/format';
 import { FilterChip } from '@/components/ui/FilterChip';
+import { PriceBadge } from '@/components/ui/PriceBadge';
 import { ProductCard } from '@/features/market/ProductCard';
 import { useMarketProducts } from '@/features/market/useMarket';
 import { useToggleCreatorFollow } from '@/features/creators/useCreatorFollow';
 import {
   useExploreCreators,
   useExploreContent,
+  useExploreCommunities,
+  useExploreChallenges,
   type ExploreCreator,
   type ExploreContentItem,
+  type ExploreCommunity,
+  type ExploreChallenge,
 } from './useExplore';
 
-type ExploreTab = 'all' | 'people' | 'content' | 'products';
+type ExploreTab = 'all' | 'people' | 'content' | 'products' | 'communities' | 'challenges';
 
 const TABS: { key: ExploreTab; label: string }[] = [
   { key: 'all', label: 'Tudo' },
   { key: 'people', label: 'Pessoas' },
   { key: 'content', label: 'Conteúdo' },
   { key: 'products', label: 'Produtos' },
+  { key: 'communities', label: 'Comunidades' },
+  { key: 'challenges', label: 'Desafios' },
 ];
 
 function CreatorCard({ creator }: { creator: ExploreCreator }) {
@@ -91,7 +107,7 @@ function CreatorCard({ creator }: { creator: ExploreCreator }) {
 function ContentTile({ item, featured }: { item: ExploreContentItem; featured?: boolean }) {
   return (
     <Link
-      to={`/feed?post=${encodeURIComponent(item.id)}`}
+      to={`/video/${encodeURIComponent(item.id)}`}
       className={clsx(
         'group relative block overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container',
         featured ? 'col-span-2 aspect-[16/10]' : 'aspect-square',
@@ -136,14 +152,106 @@ function ContentTile({ item, featured }: { item: ExploreContentItem; featured?: 
   );
 }
 
+function CommunityTile({ community }: { community: ExploreCommunity }) {
+  const to = community.creatorUsername
+    ? `/creator/${encodeURIComponent(community.creatorUsername)}`
+    : null;
+
+  const inner = (
+    <>
+      <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-gradient-to-br from-surface-container-high to-surface-container text-on-surface-variant">
+        <UsersRound size={30} aria-hidden />
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <p className="line-clamp-2 font-sans text-body font-semibold text-on-surface">
+          {community.name}
+        </p>
+        {community.description && (
+          <p className="line-clamp-2 font-sans text-body-sm text-on-surface-variant">
+            {community.description}
+          </p>
+        )}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1.5">
+          <span className="min-w-0 flex-1 truncate font-sans text-counter font-normal text-on-surface-variant">
+            {formatCount(community.memberCount)} membros
+          </span>
+          <PriceBadge price={0} />
+        </div>
+      </div>
+    </>
+  );
+  const className =
+    'group flex flex-col overflow-hidden rounded-2xl border border-outline-variant/25 bg-surface-container-lowest';
+  return to ? (
+    <Link to={to} className={className}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={className}>{inner}</div>
+  );
+}
+
+function ChallengeTile({ challenge }: { challenge: ExploreChallenge }) {
+  const to = challenge.creatorUsername
+    ? `/creator/${encodeURIComponent(challenge.creatorUsername)}`
+    : null;
+
+  const inner = (
+    <>
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-container-high">
+        {challenge.coverImageUrl ? (
+          <img
+            src={challenge.coverImageUrl}
+            alt={challenge.name}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-active:scale-105"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-container-high to-surface-container text-on-surface-variant">
+            <Trophy size={30} aria-hidden />
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <p className="line-clamp-2 font-sans text-body font-semibold text-on-surface">
+          {challenge.name}
+        </p>
+        {challenge.description && (
+          <p className="line-clamp-2 font-sans text-body-sm text-on-surface-variant">
+            {challenge.description}
+          </p>
+        )}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1.5">
+          <span className="min-w-0 flex-1 truncate font-sans text-counter font-normal text-on-surface-variant">
+            {formatCount(challenge.participantCount)} participantes
+          </span>
+          <PriceBadge price={challenge.price} />
+        </div>
+      </div>
+    </>
+  );
+  const className =
+    'group flex flex-col overflow-hidden rounded-2xl border border-outline-variant/25 bg-surface-container-lowest';
+  return to ? (
+    <Link to={to} className={className}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={className}>{inner}</div>
+  );
+}
+
 export function ExplorePage() {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<ExploreTab>('all');
   const [sport, setSport] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const creatorsQuery = useExploreCreators();
   const contentQuery = useExploreContent();
   const productsQuery = useMarketProducts();
+  const communitiesQuery = useExploreCommunities();
+  const challengesQuery = useExploreChallenges();
 
   // Esportes por creator para o filtro de conteúdo (fallback quando o post
   // não tem tag própria — paridade com o feed do v1).
@@ -199,87 +307,134 @@ export function ExplorePage() {
     return list;
   }, [productsQuery.data, sport, term]);
 
+  const communities = useMemo(() => {
+    let list = communitiesQuery.data ?? [];
+    if (sport) {
+      list = list.filter((community) => (creatorSports.get(community.creatorId) ?? []).includes(sport));
+    }
+    if (term) {
+      list = list.filter((community) =>
+        `${community.name} ${community.description ?? ''} ${community.creatorName}`
+          .toLowerCase()
+          .includes(term),
+      );
+    }
+    return list;
+  }, [communitiesQuery.data, sport, term, creatorSports]);
+
+  const challenges = useMemo(() => {
+    let list = challengesQuery.data ?? [];
+    if (sport) {
+      list = list.filter((challenge) => (creatorSports.get(challenge.creatorId) ?? []).includes(sport));
+    }
+    if (term) {
+      list = list.filter((challenge) =>
+        `${challenge.name} ${challenge.description ?? ''} ${challenge.creatorName}`
+          .toLowerCase()
+          .includes(term),
+      );
+    }
+    return list;
+  }, [challengesQuery.data, sport, term, creatorSports]);
+
   const showPeople = tab === 'all' || tab === 'people';
   const showContent = tab === 'all' || tab === 'content';
   const showProducts = tab === 'all' || tab === 'products';
+  const showCommunities = tab === 'all' || tab === 'communities';
+  const showChallenges = tab === 'all' || tab === 'challenges';
   const isLoading =
     (showPeople && creatorsQuery.isLoading) ||
     (showContent && contentQuery.isLoading) ||
-    (showProducts && productsQuery.isLoading);
+    (showProducts && productsQuery.isLoading) ||
+    (showCommunities && communitiesQuery.isLoading) ||
+    (showChallenges && challengesQuery.isLoading);
   const isEmpty =
     !isLoading &&
     (!showPeople || creators.length === 0) &&
     (!showContent || content.length === 0) &&
-    (!showProducts || products.length === 0);
+    (!showProducts || products.length === 0) &&
+    (!showCommunities || communities.length === 0) &&
+    (!showChallenges || challenges.length === 0);
   const hasError =
     (showPeople && creatorsQuery.isError) ||
     (showContent && contentQuery.isError) ||
-    (showProducts && productsQuery.isError);
+    (showProducts && productsQuery.isError) ||
+    (showCommunities && communitiesQuery.isError) ||
+    (showChallenges && challengesQuery.isError);
+  const hasActiveFilters = tab !== 'all' || sport !== null;
 
   return (
     <div className="h-full overflow-y-auto bg-background pb-8">
       <div className="mx-auto w-full max-w-[720px]">
-        {/* Cabeçalho: título + busca */}
+        {/* Cabeçalho: título + busca global + atalho para os filtros */}
         <header className="sticky top-0 z-10 bg-background/95 px-4 pb-3 pt-safe-top backdrop-blur-md">
           <h1 className="mt-3 font-sans text-title-lg text-on-surface">Explorar</h1>
-          <div className="relative mt-3">
-            <Search
-              size={18}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar creators, conteúdos e produtos..."
-              aria-label="Buscar creators, conteúdos e produtos"
-              className="min-h-[44px] w-full rounded-xl border border-outline-variant/40 bg-surface py-2 pl-11 pr-4 font-sans text-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
+          <div className="relative mt-3 flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar creators, conteúdos e produtos..."
+                aria-label="Buscar creators, conteúdos, produtos, comunidades e desafios"
+                className="min-h-[44px] w-full rounded-xl border border-outline-variant/40 bg-surface py-2 pl-11 pr-4 font-sans text-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((open) => !open)}
+              aria-expanded={filtersOpen}
+              aria-label="Mostrar filtros"
+              className={clsx(
+                'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors',
+                filtersOpen || hasActiveFilters
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-outline-variant/40 bg-surface text-on-surface-variant',
+              )}
+            >
+              <SlidersHorizontal size={18} aria-hidden />
+            </button>
           </div>
         </header>
 
-        {/* Filtros por tipo */}
-        <div className="no-scrollbar mt-1 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="Tipo de resultado">
-          {TABS.map(({ key, label }) => (
-            <FilterChip key={key} active={tab === key} onClick={() => setTab(key)}>
-              {label}
-            </FilterChip>
-          ))}
-          <Link
-            to="/comunidades"
-            className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full border border-outline-variant/50 bg-surface px-4 py-2 font-sans text-label text-on-surface-variant"
-          >
-            Comunidades
-          </Link>
-          <Link
-            to="/desafios"
-            className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full border border-outline-variant/50 bg-surface px-4 py-2 font-sans text-label text-on-surface-variant"
-          >
-            Desafios
-          </Link>
-        </div>
+        {filtersOpen && (
+          <>
+            {/* Filtros por tipo */}
+            <div className="no-scrollbar mt-1 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="Tipo de resultado">
+              {TABS.map(({ key, label }) => (
+                <FilterChip key={key} active={tab === key} onClick={() => setTab(key)}>
+                  {label}
+                </FilterChip>
+              ))}
+            </div>
 
-        {/* Filtros por grupo de afinidade */}
-        <div className="mt-4 px-4">
-          <h2 className="font-sans text-eyebrow uppercase text-on-surface-variant">
-            Grupos de afinidade
-          </h2>
-        </div>
-        <div
-          className="no-scrollbar mt-2 flex gap-2 overflow-x-auto px-4"
-          role="tablist"
-          aria-label="Grupos de afinidade"
-        >
-          <FilterChip active={sport === null} onClick={() => setSport(null)}>
-            Todos
-          </FilterChip>
-          {FEED_SPORTS.map(({ key, label }) => (
-            <FilterChip key={key} active={sport === key} onClick={() => setSport(key)}>
-              {label}
-            </FilterChip>
-          ))}
-        </div>
+            {/* Filtros por grupo de afinidade */}
+            <div className="mt-4 px-4">
+              <h2 className="font-sans text-eyebrow uppercase text-on-surface-variant">
+                Grupos de afinidade
+              </h2>
+            </div>
+            <div
+              className="no-scrollbar mt-2 flex gap-2 overflow-x-auto px-4"
+              role="tablist"
+              aria-label="Grupos de afinidade"
+            >
+              <FilterChip active={sport === null} onClick={() => setSport(null)}>
+                Todos
+              </FilterChip>
+              {FEED_SPORTS.map(({ key, label }) => (
+                <FilterChip key={key} active={sport === key} onClick={() => setSport(key)}>
+                  {label}
+                </FilterChip>
+              ))}
+            </div>
+          </>
+        )}
 
         {isLoading && (
           <div className="flex justify-center py-16">
@@ -298,6 +453,8 @@ export function ExplorePage() {
                 creatorsQuery.refetch();
                 contentQuery.refetch();
                 productsQuery.refetch();
+                communitiesQuery.refetch();
+                challengesQuery.refetch();
               }}
               className="min-h-[44px] rounded-full bg-primary px-6 font-sans text-label text-on-primary"
             >
@@ -358,6 +515,32 @@ export function ExplorePage() {
             <div className="mt-3 grid grid-cols-2 gap-3">
               {(tab === 'products' ? products : products.slice(0, 5)).map((product, index) => (
                 <ProductCard key={product.id} product={product} featured={index === 0} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {showCommunities && !isLoading && communities.length > 0 && (
+          <section className="mt-6 px-4" aria-labelledby="explore-communities-title">
+            <h2 id="explore-communities-title" className="font-sans text-title text-on-surface">
+              Comunidades
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {(tab === 'communities' ? communities : communities.slice(0, 4)).map((community) => (
+                <CommunityTile key={community.id} community={community} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {showChallenges && !isLoading && challenges.length > 0 && (
+          <section className="mt-6 px-4" aria-labelledby="explore-challenges-title">
+            <h2 id="explore-challenges-title" className="font-sans text-title text-on-surface">
+              Desafios
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {(tab === 'challenges' ? challenges : challenges.slice(0, 4)).map((challenge) => (
+                <ChallengeTile key={challenge.id} challenge={challenge} />
               ))}
             </div>
           </section>

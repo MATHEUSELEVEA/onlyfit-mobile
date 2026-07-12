@@ -1,31 +1,7 @@
 import { Link } from 'react-router-dom';
-import { clsx } from 'clsx';
-import { formatPrice } from '@/lib/format';
 import { productTypeMeta } from '@/lib/products';
+import { PriceBadge } from '@/components/ui/PriceBadge';
 import type { MarketProduct } from './useMarket';
-
-// Selo de preço no padrão do marketplace (Grátis x valor); em Meus produtos
-// vira "Adquirido", já que preço não faz mais sentido depois da compra.
-function StatusBadge({ product, owned }: { product: MarketProduct; owned?: boolean }) {
-  if (owned) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-tertiary-container px-2.5 py-1 font-sans text-counter text-on-tertiary-container">
-        Adquirido
-      </span>
-    );
-  }
-  const free = !product.price || product.price <= 0;
-  return (
-    <span
-      className={clsx(
-        'inline-flex items-center rounded-full px-2.5 py-1 font-sans text-counter',
-        free ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-primary text-on-primary',
-      )}
-    >
-      {free ? 'Grátis' : formatPrice(product.price)}
-    </span>
-  );
-}
 
 interface ProductCardProps {
   product: MarketProduct;
@@ -69,7 +45,7 @@ export function ProductCard({ product, featured = false, owned = false }: Produc
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-inverse-surface/95 via-inverse-surface/30 to-transparent" />
         <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
           {typeChip}
-          <StatusBadge product={product} owned={owned} />
+          <PriceBadge price={product.price} owned={owned} />
         </div>
         <div className="absolute inset-x-0 bottom-0 p-3 text-inverse-on-surface">
           <p className="line-clamp-2 font-sans text-title drop-shadow">{product.name}</p>
@@ -126,7 +102,7 @@ export function ProductCard({ product, featured = false, owned = false }: Produc
           <span className="min-w-0 flex-1 truncate font-sans text-counter font-normal text-on-surface-variant">
             {product.creatorName}
           </span>
-          <StatusBadge product={product} owned={owned} />
+          <PriceBadge price={product.price} owned={owned} />
         </div>
       </div>
     </>

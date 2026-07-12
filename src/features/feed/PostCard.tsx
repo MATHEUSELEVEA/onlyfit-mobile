@@ -82,9 +82,7 @@ export function PostCard({ post }: PostCardProps) {
   const { saved, toggleSaved } = useSavedPost(post.id);
 
   const profileTo = `/creator/${encodeURIComponent(post.author.username)}`;
-  // Rota de detalhe do post ainda não existe no v2; o link já nasce no
-  // formato do v1 (/post/:id) para continuar válido quando ela chegar.
-  const shareUrl = `${window.location.origin}/post/${post.id}`;
+  const shareUrl = `${window.location.origin}/video/${post.id}`;
 
   return (
     <article className="relative h-full w-full overflow-hidden bg-surface-container-lowest">

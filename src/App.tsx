@@ -5,6 +5,7 @@ import { ThemeProvider } from './theme/ThemeProvider';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AppShell } from './components/layout/AppShell';
 import { FeedPage } from './features/feed/FeedPage';
+import { VideoViewPage } from './features/feed/VideoViewPage';
 import { ExplorePage } from './features/explore/ExplorePage';
 import { TrainingPage } from './pages/TrainingPage';
 import { CommunitiesPage } from './pages/CommunitiesPage';
@@ -47,6 +48,7 @@ function AuthenticatedApp() {
         <Route element={<AppShell />}>
           <Route path="/" element={<Navigate to="/feed" replace />} />
           <Route path="/feed" element={<FeedPage />} />
+          <Route path="/video/:postId" element={<VideoViewPage />} />
           <Route path="/explorar" element={<ExplorePage />} />
           <Route path="/treino" element={<TrainingPage />} />
           <Route path="/produtos" element={<MyProductsPage />} />

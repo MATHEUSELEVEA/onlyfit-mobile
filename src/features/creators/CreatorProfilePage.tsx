@@ -19,7 +19,9 @@ import { clsx } from 'clsx';
 import type { LucideIcon } from 'lucide-react';
 import { formatCount, formatPrice } from '@/lib/format';
 import { productTypeMeta } from '@/lib/products';
+import { sportLabel } from '@/lib/sports';
 import { ShareSheet } from '@/components/ui/ShareSheet';
+import { PriceBadge } from '@/components/ui/PriceBadge';
 import type { FeedAuthor } from '@/features/feed/types';
 import { useCreatorFollowState, useToggleCreatorFollow } from './useCreatorFollow';
 import { useCreatorSubscription } from './useCreatorSubscription';
@@ -43,20 +45,6 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: 'communities', label: 'Comunidades', icon: UsersRound },
   { key: 'followers', label: 'Seguidores', icon: Users },
 ];
-
-function PriceBadge({ price }: { price: number }) {
-  const free = !price || price <= 0;
-  return (
-    <span
-      className={clsx(
-        'inline-flex items-center rounded-full px-2.5 py-1 font-sans text-counter',
-        free ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-primary text-on-primary',
-      )}
-    >
-      {free ? 'Grátis' : formatPrice(price)}
-    </span>
-  );
-}
 
 function EmptyState({ children }: { children: React.ReactNode }) {
   return (
@@ -95,7 +83,7 @@ export function CreatorProfilePage() {
     avatarUrl: seed?.avatarUrl ?? null,
     verified: seed?.verified ?? false,
     bio: null,
-    category: null,
+    sports: [],
     subscriptionPrice: 0,
     followerCount: 0,
     subscriberCount: 0,
@@ -176,9 +164,9 @@ export function CreatorProfilePage() {
           <span className="mt-0.5 font-sans text-body text-on-surface-variant">@{creator.username}</span>
         )}
 
-        {creator.category && (
+        {creator.sports.length > 0 && (
           <span className="mt-3 inline-flex rounded-full bg-primary/10 px-3 py-1 font-sans text-eyebrow uppercase text-primary">
-            {creator.category}
+            {creator.sports.map(sportLabel).join(' · ')}
           </span>
         )}
         {creator.bio && (
@@ -366,7 +354,7 @@ function ContentGrid({
       {items.map((p) => (
         <Link
           key={p.id}
-          to={`/feed?post=${encodeURIComponent(p.id)}`}
+          to={`/video/${encodeURIComponent(p.id)}`}
           className="relative aspect-square overflow-hidden rounded-lg bg-surface-container"
         >
           <Thumb url={p.thumbnailUrl} label={p.title ?? 'Conteúdo'} icon={Play} />

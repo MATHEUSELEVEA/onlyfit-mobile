@@ -74,13 +74,11 @@ export function productTypeMeta(
 // schema de produto não guarda `sports`, e isto só alimenta um filtro opcional.
 const SPORT_KEYWORDS: Record<string, string[]> = {
   bodybuilding: ['muscul', 'hipertrofia', 'bodybuild', 'fisiculturismo', 'academia'],
-  martial_arts: ['luta', 'jiu', 'jitsu', 'boxe', 'muay', 'mma', 'karate', 'karatê', 'judô', 'judo', 'taekwondo'],
-  running: ['corrida', 'runner', 'running', 'maratona', 'trote', ' 5k', ' 10k'],
-  triathlon: ['triathlon', 'triatlo', 'ironman'],
-  crossfit: ['crossfit', 'cross training', 'funcional', 'wod'],
-  cycling: ['ciclismo', 'cycling', 'pedal', 'bike', 'bicicleta', 'spinning'],
-  swimming: ['natação', 'natacao', 'nado', 'swim', 'piscina'],
-  nutrition: ['nutrição', 'nutricao', 'dieta', 'diet', 'alimentação', 'alimentacao', 'nutrition', 'keto', 'emagrec'],
+  hyrox: ['hyrox', 'crossfit', 'cross training', 'funcional', 'wod', 'sled', 'burpee broad jump', 'wall ball'],
+  lutas: ['luta', 'jiu', 'jitsu', 'boxe', 'muay', 'mma', 'karate', 'karatê', 'judô', 'judo', 'taekwondo'],
+  corrida: ['corrida', 'runner', 'running', 'maratona', 'trote', ' 5k', ' 10k', 'meia maratona'],
+  triathlon: ['triathlon', 'triatlo', 'ironman', 'ciclismo', 'cycling', 'pedal', 'bike', 'bicicleta', 'spinning', 'natação', 'natacao', 'nado', 'swim', 'piscina'],
+  saude: ['saúde', 'saude', 'nutrição', 'nutricao', 'dieta', 'diet', 'alimentação', 'alimentacao', 'nutrition', 'wellness', 'keto', 'emagrec'],
 };
 
 export function inferProductSports(text: string): string[] {

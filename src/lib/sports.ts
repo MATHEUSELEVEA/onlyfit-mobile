@@ -1,21 +1,18 @@
-// Taxonomia de esportes/grupos de afinidade do app (feed e explorar).
-// Chaves IGUAIS às do banco do onlyfit v1 (parâmetro p_sports da RPC
-// feed_home_posts_page e coluna sports de posts/creator_profiles),
-// para que os filtros funcionem de verdade.
+// Taxonomia única dos grupos de afinidade do app e do banco.
+// Estes valores também são persistidos no Supabase para filtros, feed e
+// descoberta.
 export interface FeedSport {
   key: string;
   label: string;
 }
 
 export const FEED_SPORTS: FeedSport[] = [
-  { key: 'bodybuilding', label: 'Musculação' },
-  { key: 'martial_arts', label: 'Lutas' },
-  { key: 'running', label: 'Corrida' },
+  { key: 'bodybuilding', label: 'Bodybuilding' },
+  { key: 'hyrox', label: 'Hyrox' },
+  { key: 'lutas', label: 'Lutas' },
+  { key: 'corrida', label: 'Corrida' },
   { key: 'triathlon', label: 'Triathlon' },
-  { key: 'crossfit', label: 'CrossFit' },
-  { key: 'cycling', label: 'Ciclismo' },
-  { key: 'swimming', label: 'Natação' },
-  { key: 'nutrition', label: 'Nutrição' },
+  { key: 'saude', label: 'Saúde' },
 ];
 
 const SPORT_LABELS = new Map(FEED_SPORTS.map((sport) => [sport.key, sport.label]));
