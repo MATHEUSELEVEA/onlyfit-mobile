@@ -28,7 +28,7 @@ npm run lint
 ## As 8 regras que não se quebram
 
 1. **Nunca cor hardcoded.** Sempre tokens (`bg-surface`, `text-on-surface`, `bg-primary`). O usuário troca de tema em runtime — cor hardcoded quebra isso. Ver `docs/DESIGN-SYSTEM.md`. Contexto de design para agentes: `PRODUCT.md` + `DESIGN.md` (raiz, formato impeccable/Stitch) — este repo é o **canônico** do design system da plataforma; o desktop replica.
-2. **Nunca tamanho de fonte arbitrário** (`text-[13px]`) nem `font-bold` solto. Só tokens (`text-body`, `text-label`…). Tipografia é global e igual nos 3 temas.
+2. **Nunca tamanho de fonte arbitrário** (`text-[13px]`) nem `font-bold` solto. Só tokens (`text-body`, `text-label`…). Tipografia é global e igual nos 2 temas.
 3. **Nunca segredo no cliente.** Só a `anon key` vai pro front. Nada de `service_role`, chave de gateway de pagamento ou secret no bundle. Ver `docs/SECURITY.md`.
 4. **RLS é a fonte da verdade de acesso**, não o front. Não confie em esconder botão — o banco autoriza. Ver `docs/DATABASE.md` e `docs/SECURITY.md`.
 5. **Simples > esperto.** Não adicione dependência, abstração, camada ou "framework interno" sem necessidade real. Menos código é a meta. Ver `docs/CODING-STANDARDS.md`.
@@ -54,7 +54,7 @@ src/
   pages/        só telas sem domínio ainda (Login, placeholders)
   theme/        themes.css (gerado) + ThemeProvider
 docs/           padrões e governança — comece por docs/DOCUMENTATION-INDEX.md
-docs/temas/     specs de cor dos 3 temas (fonte da verdade do design)
+docs/temas/     specs de cor dos 2 temas (fonte da verdade do design)
 docs/telas/     referências visuais de tela
 ```
 

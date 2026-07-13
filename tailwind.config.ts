@@ -39,6 +39,7 @@ const colorTokens = [
   'background',
   'on-background',
   'surface-variant',
+  'on-media-accent',
 ] as const;
 
 export default {

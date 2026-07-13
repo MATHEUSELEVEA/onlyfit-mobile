@@ -41,4 +41,4 @@ Premium, próximo, energético. A UI é firme e discreta: o conteúdo do creator
 
 ## Accessibility & Inclusion
 
-WCAG AA: contraste ≥ 4.5:1 em texto de corpo nos 3 temas, alvos de toque ≥ 44px, respeito a `prefers-reduced-motion`.
+WCAG AA: contraste ≥ 4.5:1 em texto de corpo nos 2 temas, alvos de toque ≥ 44px, respeito a `prefers-reduced-motion`.

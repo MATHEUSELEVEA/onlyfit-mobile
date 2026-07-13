@@ -27,10 +27,10 @@ import { AvatarEditor } from './AvatarEditor';
 import { myProfileQueryKey, useMyProfile, type MyProfile } from './useMyProfile';
 import { IconChip, ProfileLink, SectionEyebrow, SettingCard } from './components/SettingsPrimitives';
 
+// Espelha 1:1 `--color-surface` de cada tema em src/theme/themes.css.
 const themeSwatches: Record<ThemeId, string> = {
-  preto: '#131313',
-  azul: '#5341cd',
-  laranja: '#ff5e1a',
+  preto: '#121315',
+  claro: '#F4F5EE',
 };
 
 export function ProfilePage() {

@@ -3,7 +3,7 @@ name: OnlyFit
 description: Design system multi-tema do OnlyFit — acesso premium ao creator fitness
 colors:
   # Tema padrão "preto" (Premium Performance). Fonte da verdade: src/theme/themes.css
-  # (triplas RGB por data-theme). Os MESMOS tokens existem nos temas azul e laranja.
+  # (triplas RGB por data-theme). Os MESMOS tokens existem no tema "claro".
   primary: "#CAF300"
   on-primary: "#1E2600"
   primary-container: "#CAF300"
@@ -86,7 +86,7 @@ components:
 
 Acesso premium a quem você admira. A interface é a escuridão da arena que faz a luz cair no conteúdo: o creator é a estrela, o chrome recua. Exclusividade se sente pela contenção e precisão — nunca por dourado, brilho ou ornamento. Componentes são confiantes e diretos: formas sólidas, CTA em cor cheia, hierarquia por peso tipográfico.
 
-O sistema é **multi-tema por tokens**: os papéis semânticos (`surface`, `on-surface`, `primary`…) são fixos; o tema ativo (`preto` padrão, `azul`, `laranja`) resolve o valor em runtime via `data-theme` no `<html>`. Componente nunca conhece cor concreta. Este documento rejeita explicitamente: cara de ERP fitness, SaaS azul-marinho de cards idênticos, poluição neon "viral" e o template genérico de IA.
+O sistema é **multi-tema por tokens**: os papéis semânticos (`surface`, `on-surface`, `primary`…) são fixos; o tema ativo (`preto` padrão ou `claro`) resolve o valor em runtime via `data-theme` no `<html>`. Componente nunca conhece cor concreta. `claro` não é uma marca à parte — é o mesmo sistema com fundo/destaque invertidos: grafite assume o papel estrutural do CTA e o lime vira acento (texto sobre o CTA, containers pequenos), em vez de dominar blocos grandes como faria mal sobre fundo claro. Este documento rejeita explicitamente: cara de ERP fitness, SaaS azul-marinho de cards idênticos, poluição neon "viral" e o template genérico de IA.
 
 **Key Characteristics:**
 - Conteúdo em tela cheia; UI sobreposta, mínima e firme
@@ -100,7 +100,7 @@ O sistema é **multi-tema por tokens**: os papéis semânticos (`surface`, `on-s
 Neutros frios e des-tingidos que fazem o acento brilhar como única voz quente da tela.
 
 ### Primary
-- **Lime de Arena** (#CAF300 no tema preto): a única cor de ação. CTA (Seguir, Assinar), estado selecionado, indicador ativo. Nos outros temas o papel é o mesmo com outro valor (violeta #5341CD no azul, laranja queimado #AA3600 no laranja).
+- **Lime de Arena** (#CAF300 no tema preto): a única cor de ação. CTA (Seguir, Assinar), estado selecionado, indicador ativo. No tema claro o papel estrutural passa para o **Grafite** (#1A1B15, mesmo tom de `surface` do preto) — o lime vira acento: texto sobre o CTA (`on-primary`), badges pequenos. Evita o lime puro em blocos grandes sobre fundo claro, que lê como "cupom/promoção" em vez de "performance premium".
 
 ### Secondary
 - **Pêssego de Apoio** (#FFB79C): apoio raro — realces que não são ação.
@@ -111,7 +111,7 @@ Neutros frios e des-tingidos que fazem o acento brilhar como única voz quente d
 ### Neutral
 - **Arena** (#121315, `surface`/`background`): o palco escuro padrão.
 - **Ramp de containers** (#0D0E10 → #333438): profundidade tonal em 5 degraus; quanto mais alto o container, mais elevado o elemento.
-- **Texto** (#E6E7EA `on-surface`; #B3B7C0 `on-surface-variant`): corpo e apoio, contraste AA nos 3 temas.
+- **Texto** (#E6E7EA `on-surface`; #B3B7C0 `on-surface-variant`): corpo e apoio, contraste AA nos 2 temas.
 - **Traços** (#80838C `outline`; #3A3D43 `outline-variant`): bordas finas de 1px, geralmente com opacidade (`/30`).
 
 ### Named Rules
@@ -178,7 +178,7 @@ Painel deslizante de baixo, `rounded-t-2xl`, `border-t border-outline-variant/30
 - **Do** usar exclusivamente tokens de cor e tipografia — o tema troca em runtime.
 - **Do** dar ao conteúdo a tela inteira e sobrepor a UI com contenção.
 - **Do** usar o ramp tonal de containers para profundidade.
-- **Do** manter contraste AA (≥4.5:1) nos 3 temas ao propor cor nova.
+- **Do** manter contraste AA (≥4.5:1) nos 2 temas ao propor cor nova.
 - **Do** respeitar `prefers-reduced-motion` em qualquer animação.
 
 ### Don't:
