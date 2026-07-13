@@ -8,7 +8,7 @@ Compilar não é testar. Antes de dar por pronto, **exercite o caminho real no a
 
 - Fluxo feliz funciona.
 - Estados de **loading, vazio e erro** aparecem corretos (desligue a rede, use conta sem dado).
-- Nos **3 temas** (preto/azul/laranja) não quebra nada. Ver `docs/DESIGN-SYSTEM.md`.
+- Nos **2 temas** (preto/claro) não quebra nada. Ver `docs/DESIGN-SYSTEM.md`.
 - Em **tela estreita** (mobile-first) o layout se mantém.
 
 Sempre roda antes de PR: `npm run build` (typecheck strict) + `npm run lint`.

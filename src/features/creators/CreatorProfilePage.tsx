@@ -181,12 +181,12 @@ export function CreatorProfilePage() {
             className="flex flex-1 flex-col items-center active:opacity-70"
           >
             <span className="font-sans text-title text-on-surface">{formatCount(creator.followerCount)}</span>
-            <span className="font-sans text-counter uppercase text-on-surface-variant">Seguidores</span>
+            <span className="font-sans text-eyebrow uppercase text-on-surface-variant">Seguidores</span>
           </button>
           <div className="w-px bg-outline-variant/40" aria-hidden />
           <div className="flex flex-1 flex-col items-center">
             <span className="font-sans text-title text-on-surface">{formatCount(creator.subscriberCount)}</span>
-            <span className="font-sans text-counter uppercase text-on-surface-variant">Assinantes</span>
+            <span className="font-sans text-eyebrow uppercase text-on-surface-variant">Assinantes</span>
           </div>
         </div>
 

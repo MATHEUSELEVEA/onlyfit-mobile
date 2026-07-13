@@ -1,7 +1,10 @@
-/* GERADO a partir de onlyfit2/temas/DESIGN {PRETO,AZUL,LARANJA}.md
+/* GERADO a partir de onlyfit2/temas/DESIGN {PRETO,CLARO}.md
  * Variáveis em triplas RGB para suportar modificadores de opacidade do Tailwind
  * (ex.: bg-surface/80 -> rgb(var(--color-surface) / 0.8)).
- * Tema padrão: preto (Premium Performance).
+ * Tema padrão: preto (Premium Performance). "Claro" é o mesmo sistema com
+ * fundo/destaque invertidos — não uma marca à parte: grafite assume o papel
+ * estrutural do CTA e o lime vira acento (texto sobre o CTA, badges pequenos),
+ * evitando o efeito "neon/cupom" do lime puro em blocos grandes sobre fundo claro.
  */
 :root, [data-theme="preto"] {
   /* Neutros frios e des-tingidos: o Material derivou o cinza do lime e deixou
@@ -42,80 +45,52 @@
   --color-background: 18 19 21;
   --color-on-background: 230 231 234;
   --color-surface-variant: 46 47 51;
+  /* Acento fixo para texto/ícone sobre mídia variável (fora de card, direto
+   * sobre foto — ex. wordmark e CTA da tela de Login). Mesmo valor nos dois
+   * temas: precisa continuar lime vibrante mesmo quando `primary` deixa de
+   * ser lime no tema claro, porque a foto de fundo é sempre escura. */
+  --color-on-media-accent: 202 243 0;
 }
 
-[data-theme="azul"] {
-  --color-surface: 247 249 253;
-  --color-surface-dim: 216 218 222;
-  --color-surface-bright: 247 249 253;
+[data-theme="claro"] {
+  /* Mesma marca do tema preto, fundo/destaque invertidos. Grafite (quase o
+   * mesmo tom de `surface` do tema preto) assume o papel estrutural de CTA;
+   * o lime vira acento (texto sobre o CTA, container pequeno) em vez de
+   * dominar blocos grandes, que é o que o lime puro faria mal sobre claro. */
+  --color-surface: 244 245 238;
+  --color-surface-dim: 216 218 206;
+  --color-surface-bright: 244 245 238;
   --color-surface-container-lowest: 255 255 255;
-  --color-surface-container-low: 242 244 248;
-  --color-surface-container: 236 238 242;
-  --color-surface-container-high: 230 232 236;
-  --color-surface-container-highest: 224 227 230;
-  --color-on-surface: 25 28 31;
-  --color-on-surface-variant: 71 69 84;
-  --color-inverse-surface: 45 49 52;
-  --color-inverse-on-surface: 239 241 245;
-  --color-outline: 120 117 134;
-  --color-outline-variant: 200 196 215;
-  --color-surface-tint: 88 71 210;
-  --color-primary: 83 65 205;
-  --color-on-primary: 255 255 255;
-  --color-primary-container: 108 92 231;
-  --color-on-primary-container: 250 246 255;
-  --color-inverse-primary: 198 191 255;
-  --color-secondary: 86 94 116;
+  --color-surface-container-low: 234 235 225;
+  --color-surface-container: 224 226 212;
+  --color-surface-container-high: 214 216 199;
+  --color-surface-container-highest: 204 207 185;
+  --color-on-surface: 26 27 21;
+  --color-on-surface-variant: 74 76 62;
+  --color-inverse-surface: 43 44 38;
+  --color-inverse-on-surface: 240 241 232;
+  --color-outline: 140 143 122;
+  --color-outline-variant: 211 213 196;
+  --color-surface-tint: 26 27 21;
+  --color-primary: 26 27 21;
+  --color-on-primary: 202 243 0;
+  --color-primary-container: 202 243 0;
+  --color-on-primary-container: 89 108 0;
+  --color-inverse-primary: 202 243 0;
+  --color-secondary: 140 74 53;
   --color-on-secondary: 255 255 255;
-  --color-secondary-container: 216 223 249;
-  --color-on-secondary-container: 90 98 120;
-  --color-tertiary: 0 102 71;
+  --color-secondary-container: 251 220 203;
+  --color-on-secondary-container: 94 23 0;
+  --color-tertiary: 61 107 122;
   --color-on-tertiary: 255 255 255;
-  --color-tertiary-container: 0 130 92;
-  --color-on-tertiary-container: 225 255 237;
+  --color-tertiary-container: 220 238 243;
+  --color-on-tertiary-container: 27 52 61;
   --color-error: 186 26 26;
   --color-on-error: 255 255 255;
   --color-error-container: 255 218 214;
   --color-on-error-container: 147 0 10;
-  --color-background: 247 249 253;
-  --color-on-background: 25 28 31;
-  --color-surface-variant: 224 227 230;
-}
-
-[data-theme="laranja"] {
-  --color-surface: 252 249 240;
-  --color-surface-dim: 221 218 209;
-  --color-surface-bright: 252 249 240;
-  --color-surface-container-lowest: 255 255 255;
-  --color-surface-container-low: 247 243 234;
-  --color-surface-container: 241 238 229;
-  --color-surface-container-high: 235 232 223;
-  --color-surface-container-highest: 229 226 218;
-  --color-on-surface: 28 28 23;
-  --color-on-surface-variant: 91 65 56;
-  --color-inverse-surface: 49 49 43;
-  --color-inverse-on-surface: 244 241 232;
-  --color-outline: 143 112 102;
-  --color-outline-variant: 227 190 179;
-  --color-surface-tint: 170 54 0;
-  --color-primary: 170 54 0;
-  --color-on-primary: 255 255 255;
-  --color-primary-container: 255 94 26;
-  --color-on-primary-container: 85 23 0;
-  --color-inverse-primary: 255 181 156;
-  --color-secondary: 20 108 67;
-  --color-on-secondary: 255 255 255;
-  --color-secondary-container: 159 241 189;
-  --color-on-secondary-container: 27 112 71;
-  --color-tertiary: 120 88 47;
-  --color-on-tertiary: 255 255 255;
-  --color-tertiary-container: 178 141 95;
-  --color-on-tertiary-container: 64 39 3;
-  --color-error: 186 26 26;
-  --color-on-error: 255 255 255;
-  --color-error-container: 255 218 214;
-  --color-on-error-container: 147 0 10;
-  --color-background: 252 249 240;
-  --color-on-background: 28 28 23;
-  --color-surface-variant: 229 226 218;
+  --color-background: 244 245 238;
+  --color-on-background: 26 27 21;
+  --color-surface-variant: 220 222 208;
+  --color-on-media-accent: 202 243 0;
 }

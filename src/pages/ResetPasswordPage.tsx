@@ -97,33 +97,33 @@ export function ResetPasswordPage() {
       <div className="relative z-10 flex h-full flex-col overflow-y-auto no-scrollbar px-6 pb-safe-bottom pt-safe-top">
         <div className="animate-login-rise mx-auto flex w-full max-w-sm flex-1 flex-col justify-end pb-10 pt-16">
           <header className="mb-8">
-            <h1 className="font-sans text-5xl font-extrabold leading-none tracking-tight text-white">
-              Only<span className="text-primary">Fit</span>
+            <h1 className="font-sans text-display text-white">
+              Only<span className="text-on-media-accent">Fit</span>
             </h1>
             <p className="mt-3 max-w-[16rem] font-sans text-body text-white/70">
               Defina uma nova senha para proteger sua conta.
             </p>
           </header>
 
-          <div className="rounded-3xl border border-white/15 bg-white/10 p-6 shadow-2xl shadow-black/40 backdrop-blur-2xl">
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface p-6">
             {verifying ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-white/70">
+              <div className="flex items-center justify-center gap-2 py-8 text-on-surface-variant">
                 <Loader2 size={18} className="animate-spin" aria-hidden />
                 <span className="font-sans text-body-sm">Validando link…</span>
               </div>
             ) : success ? (
               <div className="flex flex-col items-center gap-3 py-6 text-center">
                 <CheckCircle2 size={40} className="text-primary" aria-hidden />
-                <p className="font-sans text-title-lg text-white">Senha atualizada!</p>
-                <p className="font-sans text-body-sm text-white/60">
+                <p className="font-sans text-title-lg text-on-surface">Senha atualizada!</p>
+                <p className="font-sans text-body-sm text-on-surface-variant">
                   Redirecionando para o login…
                 </p>
               </div>
             ) : linkValid ? (
               <>
                 <div className="mb-5">
-                  <h2 className="font-sans text-title-lg text-white">Nova senha</h2>
-                  <p className="mt-1 font-sans text-body-sm text-white/60">
+                  <h2 className="font-sans text-title-lg text-on-surface">Nova senha</h2>
+                  <p className="mt-1 font-sans text-body-sm text-on-surface-variant">
                     Crie uma senha forte com ao menos 6 caracteres.
                   </p>
                 </div>
@@ -138,13 +138,13 @@ export function ResetPasswordPage() {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-transparent font-sans text-body text-white placeholder:text-white/35 outline-none"
+                      className="w-full bg-transparent font-sans text-body text-on-surface placeholder:text-on-surface-variant outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                      className="ml-2 shrink-0 text-white/50 transition-colors hover:text-white"
+                      className="ml-2 shrink-0 text-on-surface-variant transition-colors hover:text-on-surface"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -159,7 +159,7 @@ export function ResetPasswordPage() {
                       placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-transparent font-sans text-body text-white placeholder:text-white/35 outline-none"
+                      className="w-full bg-transparent font-sans text-body text-on-surface placeholder:text-on-surface-variant outline-none"
                     />
                   </Field>
 
@@ -172,7 +172,7 @@ export function ResetPasswordPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="mt-2 flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-primary font-sans text-label text-on-primary shadow-lg shadow-primary/25 transition-all active:scale-[0.98] disabled:opacity-60"
+                    className="mt-2 flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-primary font-sans text-label text-on-primary transition-all active:scale-[0.98] disabled:opacity-60"
                   >
                     {submitting && <Loader2 size={18} className="animate-spin" aria-hidden />}
                     Salvar nova senha
@@ -181,8 +181,8 @@ export function ResetPasswordPage() {
               </>
             ) : (
               <div className="flex flex-col items-center gap-4 py-4 text-center">
-                <p className="font-sans text-title-lg text-white">Link inválido</p>
-                <p className="font-sans text-body-sm text-white/60">{error}</p>
+                <p className="font-sans text-title-lg text-on-surface">Link inválido</p>
+                <p className="font-sans text-body-sm text-on-surface-variant">{error}</p>
                 <button
                   type="button"
                   onClick={() => navigate('/', { replace: true })}
@@ -209,8 +209,8 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="flex items-center gap-3 rounded-2xl border border-white/15 bg-black/20 px-4 py-3.5 transition-colors focus-within:border-primary/70 focus-within:bg-black/30">
-      <span className="shrink-0 text-white/50" aria-hidden>
+    <label className="flex items-center gap-3 rounded-2xl border border-outline-variant/30 bg-surface-container px-4 py-3.5 transition-colors focus-within:border-primary/70 focus-within:bg-surface-container-high">
+      <span className="shrink-0 text-on-surface-variant" aria-hidden>
         {icon}
       </span>
       <span className="sr-only">{label}</span>

@@ -49,7 +49,7 @@ Mapa de toda a documentação do OnlyFit v2. Comece pelo topo.
 
 | Pasta | Para quê |
 |---|---|
-| [`temas/`](./temas/) | Specs de cor dos 3 temas (fonte da verdade da paleta). |
+| [`temas/`](./temas/) | Specs de cor dos 2 temas (fonte da verdade da paleta). |
 | [`telas/`](./telas/) | Referências visuais de tela. |
 
 ## Regra de manutenção

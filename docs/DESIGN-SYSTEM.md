@@ -1,6 +1,6 @@
 # DESIGN-SYSTEM.md
 
-O padrão visual do OnlyFit. A **referência de estrutura** deste design system é o tema **Azul — "Aura Precision"** (`docs/temas/DESIGN AZUL.md`): estética "Cool Tech", clara, respirável, premium, de alta precisão. Mas o app é **multi-tema**: o usuário escolhe entre **Preto**, **Azul** e **Laranja** em runtime, e o layout é o mesmo — **só a paleta de cor muda**.
+O padrão visual do OnlyFit. Uma marca só, dois modos: **Preto — "Premium Performance"** (padrão) e **Claro — "Premium Performance"** (`docs/temas/DESIGN CLARO.md`), o mesmo sistema com fundo/destaque invertidos. O usuário escolhe entre os dois em runtime; o layout é o mesmo — **só a paleta de cor muda**. Grafite assume o papel estrutural do CTA no modo claro e o lime vira acento (texto sobre o CTA, containers pequenos), evitando o efeito "neon/cupom" que o lime puro tem em blocos grandes sobre fundo claro.
 
 ## Regra de ouro
 
@@ -11,7 +11,7 @@ O padrão visual do OnlyFit. A **referência de estrutura** deste design system 
 
 ## Como o tema funciona (multi-tema)
 
-1. Cada tema é especificado em `docs/temas/DESIGN {PRETO,AZUL,LARANJA}.md` (fonte da verdade da paleta).
+1. Cada tema é especificado em `docs/temas/DESIGN {PRETO,CLARO}.md` (fonte da verdade da paleta).
 2. Essas specs viram variáveis CSS em `src/theme/themes.css`, em **triplas RGB** por `data-theme` — ex. `--color-primary: 83 65 205;` — para suportar opacidade do Tailwind (`bg-primary/80`).
 3. `tailwind.config.ts` mapeia cada token para `rgb(var(--color-<token>) / <alpha-value>)`.
 4. `src/theme/ThemeProvider.tsx` guarda o tema escolhido em `localStorage` (`onlyfit.theme`) e aplica `data-theme` no `<html>`.
@@ -22,8 +22,7 @@ Temas disponíveis (de `ThemeProvider.tsx`):
 | id | Nome | Referência |
 |---|---|---|
 | `preto` | Premium Performance (padrão) | `docs/temas/DESIGN PRETO.md` |
-| `azul` | Aura Precision | `docs/temas/DESIGN AZUL.md` |
-| `laranja` | Editorial | `docs/temas/DESIGN LARANJA.md` |
+| `claro` | Premium Performance — Claro | `docs/temas/DESIGN CLARO.md` |
 
 ### Adicionar um tema novo
 
@@ -34,7 +33,7 @@ Temas disponíveis (de `ThemeProvider.tsx`):
 
 ## Tokens de cor (papéis, não cores)
 
-Use pelo papel semântico. Os mesmos tokens existem nos 3 temas com valores diferentes.
+Use pelo papel semântico. Os mesmos tokens existem nos 2 temas com valores diferentes.
 
 - **Superfícies:** `surface`, `surface-container`(-low/-high/-highest), `background`, `surface-variant`.
 - **Conteúdo sobre superfície:** `on-surface`, `on-surface-variant`, `on-background`.
@@ -45,7 +44,7 @@ Use pelo papel semântico. Os mesmos tokens existem nos 3 temas com valores dife
 
 Regra prática: fundo de bloco = `surface`/`surface-container`; texto = `on-surface`; CTA = `bg-primary text-on-primary`; borda fina = `border-outline-variant`; erro = `text-error`.
 
-## Tipografia (padrão TikTok — global, igual nos 3 temas)
+## Tipografia (padrão TikTok — global, igual nos 2 temas)
 
 Uma única família sans (Inter + fallback do sistema). Hierarquia por **peso e tamanho**, nunca por trocar de fonte. **Nunca `uppercase` nem `letter-spacing`** em texto de uso geral (botão, nav, corpo) — não é o estilo. Única exceção: `text-eyebrow` (cabeçalho de seção discreto, uppercase proposital).
 
@@ -83,6 +82,6 @@ Sempre `font-sans text-<token>`. O peso já vem no token — não some `font-bol
 
 ## Antes de considerar a UI pronta
 
-- [ ] Trocar entre preto/azul/laranja não quebra nada nem some texto (contraste ok nos 3).
+- [ ] Trocar entre preto/claro não quebra nada nem some texto (contraste ok nos 2).
 - [ ] Zero hex/`text-white`/`text-black`/tamanho arbitrário no diff.
 - [ ] Layout íntegro em tela estreita (mobile-first).

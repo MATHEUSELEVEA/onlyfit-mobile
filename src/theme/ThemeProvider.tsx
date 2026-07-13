@@ -3,8 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 // eslint-disable-next-line react-refresh/only-export-components -- tokens do tema vivem junto do provider
 export const THEMES = [
   { id: 'preto', label: 'Preto — Premium Performance' },
-  { id: 'azul', label: 'Azul — Aura Precision' },
-  { id: 'laranja', label: 'Laranja — Editorial' },
+  { id: 'claro', label: 'Claro — Premium Performance' },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]['id'];

@@ -20,7 +20,7 @@ Rode esta lista antes de pedir review. Serve para pessoa e para IA. Se um item f
 
 - [ ] Zero cor hardcoded — só tokens (`bg-surface`, `text-primary`…).
 - [ ] Zero tamanho de fonte arbitrário / `font-bold` solto — só tokens de tipografia.
-- [ ] Testei nos 3 temas (preto/azul/laranja): sem quebra e com contraste ok. (`docs/DESIGN-SYSTEM.md`)
+- [ ] Testei nos 2 temas (preto/claro): sem quebra e com contraste ok. (`docs/DESIGN-SYSTEM.md`)
 - [ ] Layout íntegro em tela estreita (mobile-first).
 
 ## Dados / segurança
