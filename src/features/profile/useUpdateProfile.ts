@@ -31,11 +31,18 @@ export function useUpdateProfile() {
     mutationFn: async ({ userId, updates }: { userId: string; updates: ProfileUpdateInput }) => {
       const validated = profileUpdateSchema.parse(updates);
 
+      // O RETURNING (`.select`) só pode conter colunas que o papel
+      // `authenticated` tem permissão de LER. Em produção o SELECT de `phone`
+      // (e demais campos sensíveis) é revogado — lê-se só via RPC
+      // `get_my_sensitive_profile`. Incluir `phone` aqui fazia o Postgres
+      // devolver 42501 ("permission denied for column phone"), que o bloco
+      // abaixo interpretava como sessão expirada e deslogava o usuário. O
+      // update de `phone` continua acontecendo; apenas não o pedimos de volta.
       const { data, error } = await supabase
         .from('profiles')
         .update(validated)
         .eq('id', userId)
-        .select('id, full_name, username, bio, phone, language, country_code')
+        .select('id, full_name, username, bio, language, country_code')
         .maybeSingle();
 
       if (error) {
@@ -73,6 +80,9 @@ export function useUpdateProfile() {
             }
           : current,
       );
+      // `phone` vive na query de campos sensíveis (lida via RPC); como o update
+      // pode tê-lo alterado, invalida essa query para a tela refletir o novo valor.
+      queryClient.invalidateQueries({ queryKey: ['my-sensitive-profile', userId] });
     },
   });
 }
