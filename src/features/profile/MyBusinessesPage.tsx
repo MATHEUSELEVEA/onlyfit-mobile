@@ -1,9 +1,8 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  BellRing,
   BriefcaseBusiness,
   Building2,
   Check,
@@ -11,7 +10,6 @@ import {
   Loader2,
   Plus,
   ShieldCheck,
-  UserPlus,
   UsersRound,
   X,
   type LucideIcon,
@@ -21,8 +19,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/i18n/I18nProvider';
 import { supabase } from '@/lib/supabase';
 import { FEED_SPORTS, sportLabel } from '@/lib/sports';
-import { BottomSheet } from '@/components/ui/BottomSheet';
-import { SelectField, TextField } from '@/components/ui/TextField';
 import { myProfileQueryKey, useMyProfile, type MyProfile } from './useMyProfile';
 
 const MAX_GROUPS = 3;
@@ -88,15 +84,11 @@ export function MyBusinessesPage() {
 
   const [activeTab, setActiveTab] = useState<BusinessTab>('owned');
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [inviteBusiness, setInviteBusiness] = useState<BusinessRow | null>(null);
-  const [inviteUsername, setInviteUsername] = useState('');
-  const [inviteRole, setInviteRole] = useState<'staff' | 'owner'>('staff');
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
   const isProfessional = profile?.isProfessional ?? false;
   const selectedGroups = profile?.affinitySports ?? [];
-  const pendingCount = connections.filter((item) => item.membership_status === 'pending').length;
+  const pendingInvites = connections.filter((item) => item.membership_status === 'pending');
+  const managedBusinesses = connections.filter((item) => item.membership_status === 'active');
 
   const setAffinityGroupsMutation = useMutation({
     mutationFn: async (sports: string[]) => {
@@ -123,36 +115,6 @@ export function MyBusinessesPage() {
     },
   });
 
-  const inviteMutation = useMutation({
-    mutationFn: async () => {
-      if (!inviteBusiness) return;
-      const { error } = await supabase.rpc('invite_organization_member', {
-        p_organization_id: inviteBusiness.id,
-        p_username: inviteUsername.trim(),
-        p_role: inviteRole,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setInviteError(null);
-      setInviteSuccess(t('profile.business.invite.success'));
-      setInviteUsername('');
-    },
-    onError: (error) => {
-      const message = error instanceof Error ? error.message : '';
-      setInviteSuccess(null);
-      setInviteError(
-        message.includes('username_not_found')
-          ? t('profile.business.invite.userNotFound')
-          : message.includes('already_a_member')
-            ? t('profile.business.invite.alreadyMember')
-            : message.includes('cannot_invite_yourself')
-              ? t('profile.business.invite.yourself')
-              : t('profile.business.invite.error'),
-      );
-    },
-  });
-
   const respondMutation = useMutation({
     mutationFn: async ({ organizationId, accept }: { organizationId: string; accept: boolean }) => {
       const { error } = await supabase.rpc('respond_organization_invite', {
@@ -173,30 +135,6 @@ export function MyBusinessesPage() {
     }
     const next = active ? selectedGroups.filter((item) => item !== key) : [...selectedGroups, key];
     setAffinityGroupsMutation.mutate(next);
-  }
-
-  function openInvite(business: BusinessRow) {
-    setInviteBusiness(business);
-    setInviteUsername('');
-    setInviteRole('staff');
-    setInviteError(null);
-    setInviteSuccess(null);
-  }
-
-  function closeInvite() {
-    if (inviteMutation.isPending) return;
-    setInviteBusiness(null);
-  }
-
-  function submitInvite(event: FormEvent) {
-    event.preventDefault();
-    setInviteError(null);
-    setInviteSuccess(null);
-    if (inviteUsername.trim().replace(/^@/, '').length < 2) {
-      setInviteError(t('profile.business.invite.usernameRequired'));
-      return;
-    }
-    inviteMutation.mutate();
   }
 
   const dateFormatter = useMemo(
@@ -220,20 +158,17 @@ export function MyBusinessesPage() {
             >
               <ArrowLeft size={21} aria-hidden />
             </Link>
-            <div className="min-w-0">
-              <h1 className="truncate font-sans text-title-lg text-on-surface">{t('profile.business.title')}</h1>
-              <p className="mt-1 font-sans text-body-sm text-on-surface-variant">
-                {t('profile.business.pageDescription')}
-              </p>
-            </div>
+            <h1 className="min-w-0 truncate font-sans text-title-lg text-on-surface">
+              {t('profile.business.title')}
+            </h1>
           </div>
         </header>
 
-        <main className="px-4 pb-8 pt-3">
+        <main className="px-4 pb-8 pt-2">
           <div
             role="tablist"
             aria-label={t('profile.business.tabsLabel')}
-            className="grid grid-cols-2 rounded-xl bg-surface-container-low p-1"
+            className="grid grid-cols-2 gap-1 rounded-xl bg-surface-container-low p-1"
           >
             <TabButton
               id="owned-tab"
@@ -247,33 +182,31 @@ export function MyBusinessesPage() {
               active={activeTab === 'invited'}
               label={t('profile.business.invitedShort')}
               count={connections.length}
-              alertCount={pendingCount}
+              alertCount={pendingInvites.length}
               onClick={() => setActiveTab('invited')}
             />
           </div>
 
           {activeTab === 'owned' ? (
-            <section role="tabpanel" aria-labelledby="owned-tab" className="pt-6">
+            <section role="tabpanel" aria-labelledby="owned-tab">
               {isProfessional && (
-                <section aria-labelledby="affinity-title">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 id="affinity-title" className="font-sans text-title text-on-surface">
-                        {t('profile.affinity.title')}
-                      </h2>
-                      <p className="mt-1 font-sans text-body-sm text-on-surface-variant">
-                        {t('profile.business.affinityDescription')}
-                      </p>
-                    </div>
-                    {setAffinityGroupsMutation.isPending ? (
-                      <Loader2 size={17} className="mt-1 shrink-0 animate-spin text-primary" aria-label={t('profile.business.saving')} />
+                <Group
+                  className="mt-6"
+                  title={t('profile.affinity.title')}
+                  hint={t('profile.business.affinityHint')}
+                  trailing={
+                    setAffinityGroupsMutation.isPending ? (
+                      <Loader2
+                        size={16}
+                        className="animate-spin text-primary"
+                        aria-label={t('profile.business.saving')}
+                      />
                     ) : (
-                      <span className="shrink-0 rounded-full bg-surface-container px-2.5 py-1 font-sans text-counter text-on-surface-variant">
-                        {selectedGroups.length}/{MAX_GROUPS}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                      <Counter value={`${selectedGroups.length}/${MAX_GROUPS}`} />
+                    )
+                  }
+                >
+                  <div className="flex flex-wrap gap-2 p-3">
                     {FEED_SPORTS.map((sport) => {
                       const active = selectedGroups.includes(sport.key);
                       return (
@@ -284,10 +217,10 @@ export function MyBusinessesPage() {
                           disabled={setAffinityGroupsMutation.isPending}
                           aria-pressed={active}
                           className={clsx(
-                            'inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 font-sans text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60',
+                            'inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 font-sans text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60',
                             active
                               ? 'bg-primary text-on-primary'
-                              : 'border border-outline-variant/50 bg-surface text-on-surface-variant hover:bg-surface-container-low',
+                              : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest',
                           )}
                         >
                           {active && <Check size={15} strokeWidth={3} aria-hidden />}
@@ -296,187 +229,159 @@ export function MyBusinessesPage() {
                       );
                     })}
                   </div>
-                  {feedback && <p role="alert" className="mt-3 font-sans text-body-sm text-error">{feedback}</p>}
-                </section>
+                </Group>
               )}
 
-              <div className={isProfessional ? 'mt-8' : ''}>
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <h2 className="font-sans text-title text-on-surface">{t('profile.business.ownedTitle')}</h2>
-                    <p className="mt-1 font-sans text-body-sm text-on-surface-variant">
-                      {t('profile.business.ownedDescription')}
-                    </p>
-                  </div>
-                  {isProfessional && ownedBusinesses.length > 0 && (
-                    <Link
-                      to="/negocios/novo"
-                      className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 font-sans text-label text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <Plus size={17} aria-hidden />
-                      {t('profile.business.createShort')}
-                    </Link>
-                  )}
-                </div>
+              <Group className="mt-8" title={t('profile.business.ownedTitle')}>
+                {isLoadingOwned ? (
+                  <LoadingRows />
+                ) : ownedError ? (
+                  <ErrorRow message={t('profile.business.loadError')} />
+                ) : (
+                  <>
+                    {ownedBusinesses.map((business) => (
+                      <BusinessLinkRow
+                        key={business.id}
+                        to={`/negocios/${business.id}`}
+                        name={business.name}
+                        logoUrl={business.logo_url}
+                        verified={business.verified}
+                        meta={businessMeta(business, dateFormatter)}
+                        badge={business.status ? businessStatusLabel[business.status] ?? business.status : null}
+                        verifiedLabel={t('profile.business.verified')}
+                      />
+                    ))}
 
-                <div className="mt-4">
-                  {isLoadingOwned ? (
-                    <LoadingBlock label={t('profile.business.loading')} />
-                  ) : ownedError ? (
-                    <ErrorBlock message={t('profile.business.loadError')} />
-                  ) : ownedBusinesses.length > 0 ? (
-                    <div className="divide-y divide-outline-variant/25 rounded-2xl bg-surface">
-                      {ownedBusinesses.map((business) => (
-                        <BusinessListItem
-                          key={business.id}
-                          business={business}
-                          dateFormatter={dateFormatter}
-                          onInvite={() => openInvite(business)}
-                          manageLabel={t('profile.business.manage')}
-                          inviteLabel={t('profile.business.invite.action')}
-                          verifiedLabel={t('profile.business.verified')}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <EmptyBlock
+                    {ownedBusinesses.length === 0 && (
+                      <MessageRow
                         icon={isProfessional ? BriefcaseBusiness : ShieldCheck}
-                        title={isProfessional ? t('profile.business.emptyOwnedTitle') : t('profile.business.activateTitle')}
+                        title={
+                          isProfessional
+                            ? t('profile.business.emptyOwnedTitle')
+                            : t('profile.business.activateTitle')
+                        }
                         description={
                           isProfessional
                             ? t('profile.business.emptyOwnedDescription')
                             : t('profile.business.activateDescription')
                         }
                       />
-                      {isProfessional && (
-                        <Link
-                          to="/negocios/novo"
-                          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 font-sans text-label text-on-primary transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-primary/80"
-                        >
-                          <Plus size={18} aria-hidden />
-                          {t('profile.business.createBusiness')}
-                        </Link>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+                    )}
+
+                    {isProfessional ? (
+                      <ActionRow
+                        to="/negocios/novo"
+                        icon={Plus}
+                        label={t('profile.business.createBusiness')}
+                      />
+                    ) : (
+                      <ActionRow
+                        to="/perfil"
+                        icon={ShieldCheck}
+                        label={t('profile.business.activateAction')}
+                      />
+                    )}
+                  </>
+                )}
+              </Group>
+
+              {feedback && (
+                <p role="alert" className="mt-3 font-sans text-body-sm text-error">
+                  {feedback}
+                </p>
+              )}
             </section>
           ) : (
-            <section role="tabpanel" aria-labelledby="invited-tab" className="pt-6">
-              {pendingCount > 0 && (
-                <div className="mb-6 flex gap-3 rounded-2xl bg-primary/10 p-4 text-on-surface" role="status">
-                  <BellRing size={20} className="mt-0.5 shrink-0 text-primary" aria-hidden />
-                  <div>
-                    <p className="font-sans text-body font-semibold">
-                      {pendingCount === 1
-                        ? t('profile.business.invite.pendingOne')
-                        : `${pendingCount} ${t('profile.business.invite.pendingMany')}`}
-                    </p>
-                    <p className="mt-1 font-sans text-body-sm text-on-surface-variant">
-                      {t('profile.business.invite.pendingHint')}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <h2 className="font-sans text-title text-on-surface">{t('profile.business.invitedTitle')}</h2>
-              <p className="mt-1 font-sans text-body-sm text-on-surface-variant">
-                {t('profile.business.invitedDescription')}
-              </p>
-
-              <div className="mt-4">
-                {isLoadingConnections ? (
-                  <LoadingBlock label={t('profile.business.loading')} />
-                ) : connectionsError ? (
-                  <ErrorBlock message={t('profile.business.loadError')} />
-                ) : connections.length > 0 ? (
-                  <div className="space-y-3">
-                    {connections.map((connection) => (
-                      <ConnectionItem
-                        key={connection.organization_id}
-                        connection={connection}
-                        isResponding={
-                          respondMutation.isPending &&
-                          respondMutation.variables?.organizationId === connection.organization_id
-                        }
-                        onRespond={(accept) =>
-                          respondMutation.mutate({ organizationId: connection.organization_id, accept })
-                        }
-                      />
-                    ))}
-                    {respondMutation.isError && (
-                      <p role="alert" className="font-sans text-body-sm text-error">
-                        {t('profile.business.invite.respondError')}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <EmptyBlock
+            <section role="tabpanel" aria-labelledby="invited-tab">
+              {isLoadingConnections ? (
+                <Group className="mt-6" title={t('profile.business.managedTitle')}>
+                  <LoadingRows />
+                </Group>
+              ) : connectionsError ? (
+                <Group className="mt-6" title={t('profile.business.managedTitle')}>
+                  <ErrorRow message={t('profile.business.loadError')} />
+                </Group>
+              ) : connections.length === 0 ? (
+                <Group className="mt-6" title={t('profile.business.managedTitle')}>
+                  <MessageRow
                     icon={UsersRound}
                     title={t('profile.business.emptyInvitedTitle')}
                     description={t('profile.business.emptyInvitedDescription')}
                   />
-                )}
-              </div>
+                </Group>
+              ) : (
+                <>
+                  {pendingInvites.length > 0 && (
+                    <section className="mt-6" aria-labelledby="pending-invites-title">
+                      <GroupHeader id="pending-invites-title" title={t('profile.business.invite.pendingTitle')} />
+                      <div className="mt-2 space-y-3">
+                        {pendingInvites.map((connection) => (
+                          <InviteCard
+                            key={connection.organization_id}
+                            connection={connection}
+                            isResponding={
+                              respondMutation.isPending &&
+                              respondMutation.variables?.organizationId === connection.organization_id
+                            }
+                            onRespond={(accept) =>
+                              respondMutation.mutate({ organizationId: connection.organization_id, accept })
+                            }
+                          />
+                        ))}
+                      </div>
+                      {respondMutation.isError && (
+                        <p role="alert" className="mt-3 font-sans text-body-sm text-error">
+                          {t('profile.business.invite.respondError')}
+                        </p>
+                      )}
+                    </section>
+                  )}
+
+                  {managedBusinesses.length > 0 && (
+                    <Group
+                      className={pendingInvites.length > 0 ? 'mt-8' : 'mt-6'}
+                      title={t('profile.business.managedTitle')}
+                    >
+                      {managedBusinesses.map((connection) => (
+                        <BusinessLinkRow
+                          key={connection.organization_id}
+                          to={`/negocios/${connection.organization_id}`}
+                          name={connection.organization_name}
+                          logoUrl={connection.logo_url}
+                          verified={connection.verified}
+                          meta={`${t('profile.business.invite.ownerLabel')} ${connection.owner_name}${connection.owner_username ? ` (@${connection.owner_username})` : ''}`}
+                          badge={
+                            connection.role === 'owner'
+                              ? t('profile.business.role.owner')
+                              : t('profile.business.role.collaborator')
+                          }
+                          verifiedLabel={t('profile.business.verified')}
+                        />
+                      ))}
+                    </Group>
+                  )}
+                </>
+              )}
             </section>
           )}
         </main>
       </div>
-
-      <BottomSheet
-        open={Boolean(inviteBusiness)}
-        onClose={closeInvite}
-        title={t('profile.business.invite.title')}
-        description={inviteBusiness?.name}
-      >
-        <form onSubmit={submitInvite} className="space-y-4 px-5 pb-6 pt-4">
-          <TextField
-            label={t('profile.business.invite.username')}
-            value={inviteUsername}
-            placeholder="@usuario"
-            autoCapitalize="none"
-            autoCorrect="off"
-            error={inviteError}
-            hint={t('profile.business.invite.usernameHint')}
-            onChange={(event) => setInviteUsername(event.target.value)}
-          />
-          <SelectField
-            label={t('profile.business.invite.role')}
-            value={inviteRole}
-            onChange={(value) => setInviteRole(value as 'staff' | 'owner')}
-            options={[
-              { value: 'staff', label: t('profile.business.role.collaborator') },
-              { value: 'owner', label: t('profile.business.role.owner') },
-            ]}
-          />
-          <p className="font-sans text-body-sm text-on-surface-variant">
-            {t('profile.business.invite.roleHint')}
-          </p>
-          {inviteSuccess && <p role="status" className="font-sans text-body-sm text-primary">{inviteSuccess}</p>}
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={closeInvite}
-              disabled={inviteMutation.isPending}
-              className="min-h-11 flex-1 rounded-xl border border-outline-variant/50 px-4 font-sans text-label text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
-            >
-              {t('profile.business.invite.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={inviteMutation.isPending}
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-sans text-label text-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
-            >
-              {inviteMutation.isPending && <Loader2 size={16} className="animate-spin" aria-hidden />}
-              {inviteMutation.isPending ? t('profile.business.invite.sending') : t('profile.business.invite.send')}
-            </button>
-          </div>
-        </form>
-      </BottomSheet>
     </div>
   );
+}
+
+function businessMeta(business: BusinessRow, dateFormatter: Intl.DateTimeFormat) {
+  const createdAt = business.created_at ? dateFormatter.format(new Date(business.created_at)) : null;
+  const sports = (business.sports ?? []).map(sportLabel).join(', ');
+  const kind =
+    business.business_type === 'independent'
+      ? 'Negócio independente'
+      : business.business_type === 'company'
+        ? 'Negócio empresarial'
+        : business.kind
+          ? businessKindLabel[business.kind] ?? business.kind
+          : 'Negócio';
+  return [kind, sports, createdAt].filter(Boolean).join(' · ');
 }
 
 function useOwnedBusinesses(userId: string | undefined) {
@@ -508,6 +413,73 @@ function useBusinessConnections(userId: string | undefined) {
   });
 }
 
+// Cabeçalho discreto + caixa de conteúdo: o rótulo nomeia o grupo, as linhas
+// dentro da caixa são o que o usuário toca. Mantém o título da seção abaixo do
+// nome do negócio na hierarquia, como em listas agrupadas nativas.
+function Group({
+  className,
+  title,
+  hint,
+  trailing,
+  children,
+}: {
+  className?: string;
+  title: string;
+  hint?: string;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  const titleId = `group-${title.replace(/\s+/g, '-').toLowerCase()}`;
+  return (
+    <section className={className} aria-labelledby={titleId}>
+      <GroupHeader id={titleId} title={title} hint={hint} trailing={trailing} />
+      <div className="mt-2 divide-y divide-outline-variant/30 overflow-hidden rounded-2xl bg-surface-container">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function GroupHeader({
+  id,
+  title,
+  hint,
+  trailing,
+}: {
+  id: string;
+  title: string;
+  hint?: string;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-1">
+      <div className="min-w-0">
+        <h2 id={id} className="font-sans text-label text-on-surface">
+          {title}
+        </h2>
+        {hint && <p className="mt-0.5 font-sans text-body-sm text-on-surface-variant">{hint}</p>}
+      </div>
+      {trailing && <div className="flex h-5 shrink-0 items-center">{trailing}</div>}
+    </div>
+  );
+}
+
+function Counter({ value }: { value: string }) {
+  return (
+    <span className="rounded-full bg-surface-container px-2 py-0.5 font-sans text-counter text-on-surface-variant">
+      {value}
+    </span>
+  );
+}
+
+function Badge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex rounded-full bg-surface-container-highest px-2.5 py-1 font-sans text-counter text-on-surface-variant">
+      {label}
+    </span>
+  );
+}
+
 function TabButton({
   id,
   active,
@@ -532,7 +504,9 @@ function TabButton({
       onClick={onClick}
       className={clsx(
         'relative inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 font-sans text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-        active ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface',
+        active
+          ? 'bg-surface-container-high text-on-surface'
+          : 'text-on-surface-variant hover:bg-surface-container/60 hover:text-on-surface',
       )}
     >
       {label}
@@ -550,73 +524,66 @@ function TabButton({
   );
 }
 
-function BusinessListItem({
-  business,
-  dateFormatter,
-  onInvite,
-  manageLabel,
-  inviteLabel,
+// O negócio inteiro é o alvo de toque — sem botão solto ao lado do card, que era
+// o que fazia negócio e ação parecerem coisas separadas na tela.
+function BusinessLinkRow({
+  to,
+  name,
+  logoUrl,
+  verified,
+  meta,
+  badge,
   verifiedLabel,
 }: {
-  business: BusinessRow;
-  dateFormatter: Intl.DateTimeFormat;
-  onInvite: () => void;
-  manageLabel: string;
-  inviteLabel: string;
+  to: string;
+  name: string;
+  logoUrl: string | null;
+  verified: boolean;
+  meta: string;
+  badge: string | null;
   verifiedLabel: string;
 }) {
-  const createdAt = business.created_at ? dateFormatter.format(new Date(business.created_at)) : null;
-  const sports = (business.sports ?? []).map(sportLabel).join(', ');
-  const kind = business.business_type === 'independent'
-    ? 'Negócio independente'
-    : business.business_type === 'company'
-      ? 'Negócio empresarial'
-      : business.kind
-        ? businessKindLabel[business.kind] ?? business.kind
-        : 'Negócio';
-  const status = business.status ? businessStatusLabel[business.status] ?? business.status : null;
-
   return (
-    <article className="px-3 py-4">
-      <div className="flex gap-3">
-        <BusinessLogo name={business.name} logoUrl={business.logo_url} />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <h3 className="truncate font-sans text-body font-semibold text-on-surface">{business.name}</h3>
-            {business.verified && <ShieldCheck size={17} className="shrink-0 text-primary" aria-label={verifiedLabel} />}
-          </div>
-          <p className="mt-1 line-clamp-2 font-sans text-body-sm text-on-surface-variant">
-            {[kind, sports, createdAt].filter(Boolean).join(' · ')}
-          </p>
-          {status && (
-            <span className="mt-2 inline-flex rounded-full bg-surface-container-high px-2.5 py-1 font-sans text-counter text-on-surface-variant">
-              {status}
-            </span>
-          )}
+    <Link
+      to={to}
+      className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary active:bg-surface-container-high"
+    >
+      <BusinessLogo name={name} logoUrl={logoUrl} />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h3 className="truncate font-sans text-title text-on-surface">{name}</h3>
+          {verified && <ShieldCheck size={16} className="shrink-0 text-primary" aria-label={verifiedLabel} />}
         </div>
+        <p className="mt-0.5 truncate font-sans text-body-sm text-on-surface-variant">{meta}</p>
+        {badge && (
+          <div className="mt-2">
+            <Badge label={badge} />
+          </div>
+        )}
       </div>
-      <div className="mt-3 flex gap-2 pl-14">
-        <button
-          type="button"
-          onClick={onInvite}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline-variant/50 px-3 font-sans text-label text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <UserPlus size={16} aria-hidden />
-          {inviteLabel}
-        </button>
-        <Link
-          to={`/negocios/${business.id}`}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-surface-container-low px-3 font-sans text-label text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          {manageLabel}
-          <ChevronRight size={16} aria-hidden />
-        </Link>
-      </div>
-    </article>
+      <ChevronRight size={18} className="shrink-0 text-on-surface-variant" aria-hidden />
+    </Link>
   );
 }
 
-function ConnectionItem({
+function ActionRow({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary active:bg-surface-container-high"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Icon size={20} aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1 truncate font-sans text-body font-semibold text-primary">{label}</span>
+      <ChevronRight size={18} className="shrink-0 text-primary" aria-hidden />
+    </Link>
+  );
+}
+
+// Convite pendente é o único item da tela com duas ações próprias, então
+// permanece um card fechado: identidade, quem convidou e a decisão, juntos.
+function InviteCard({
   connection,
   isResponding,
   onRespond,
@@ -626,64 +593,49 @@ function ConnectionItem({
   onRespond: (accept: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const role = connection.role === 'owner'
-    ? t('profile.business.role.owner')
-    : t('profile.business.role.collaborator');
+  const role =
+    connection.role === 'owner' ? t('profile.business.role.owner') : t('profile.business.role.collaborator');
 
   return (
-    <article className="rounded-2xl bg-surface p-4">
-      <div className="flex gap-3">
+    <article className="rounded-2xl bg-surface-container p-4">
+      <div className="flex items-center gap-3">
         <BusinessLogo name={connection.organization_name} logoUrl={connection.logo_url} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="truncate font-sans text-body font-semibold text-on-surface">
-              {connection.organization_name}
-            </h3>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h3 className="truncate font-sans text-title text-on-surface">{connection.organization_name}</h3>
             {connection.verified && (
-              <ShieldCheck size={17} className="shrink-0 text-primary" aria-label={t('profile.business.verified')} />
+              <ShieldCheck size={16} className="shrink-0 text-primary" aria-label={t('profile.business.verified')} />
             )}
           </div>
-          <p className="mt-1 font-sans text-body-sm text-on-surface-variant">
-            {connection.membership_status === 'pending'
-              ? `${t('profile.business.invite.invitedBy')} ${connection.inviter_name}${connection.inviter_username ? ` (@${connection.inviter_username})` : ''}`
-              : `${t('profile.business.invite.ownerLabel')} ${connection.owner_name}${connection.owner_username ? ` (@${connection.owner_username})` : ''}`}
+          <p className="mt-0.5 truncate font-sans text-body-sm text-on-surface-variant">
+            {`${t('profile.business.invite.invitedBy')} ${connection.inviter_name}${connection.inviter_username ? ` (@${connection.inviter_username})` : ''}`}
           </p>
-          <span className="mt-2 inline-flex rounded-full bg-surface-container-high px-2.5 py-1 font-sans text-counter text-on-surface-variant">
-            {role}
-          </span>
+          <div className="mt-2">
+            <Badge label={`${t('profile.business.invite.asRole')} ${role}`} />
+          </div>
         </div>
       </div>
 
-      {connection.membership_status === 'pending' ? (
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            disabled={isResponding}
-            onClick={() => onRespond(false)}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline-variant/50 font-sans text-label text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
-          >
-            <X size={16} aria-hidden />
-            {t('profile.business.invite.reject')}
-          </button>
-          <button
-            type="button"
-            disabled={isResponding}
-            onClick={() => onRespond(true)}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary font-sans text-label text-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
-          >
-            {isResponding ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Check size={16} aria-hidden />}
-            {t('profile.business.invite.accept')}
-          </button>
-        </div>
-      ) : (
-        <Link
-          to={`/negocios/${connection.organization_id}`}
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-xl bg-primary px-4 font-sans text-label text-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          disabled={isResponding}
+          onClick={() => onRespond(false)}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-surface-container-high px-5 font-sans text-label text-on-surface transition-colors hover:bg-surface-container-highest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
         >
-          {t('profile.business.manage')}
-          <ChevronRight size={16} aria-hidden />
-        </Link>
-      )}
+          <X size={16} aria-hidden />
+          {t('profile.business.invite.reject')}
+        </button>
+        <button
+          type="button"
+          disabled={isResponding}
+          onClick={() => onRespond(true)}
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary font-sans text-label text-on-primary transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+        >
+          {isResponding ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Check size={16} aria-hidden />}
+          {t('profile.business.invite.accept')}
+        </button>
+      </div>
     </article>
   );
 }
@@ -693,7 +645,7 @@ function BusinessLogo({ name, logoUrl }: { name: string; logoUrl: string | null 
     <img src={logoUrl} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover" />
   ) : (
     <span
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-on-surface-variant"
       aria-label={name}
     >
       <Building2 size={20} aria-hidden />
@@ -701,10 +653,10 @@ function BusinessLogo({ name, logoUrl }: { name: string; logoUrl: string | null 
   );
 }
 
-function EmptyBlock({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
+function MessageRow({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl bg-surface-container-low px-4 py-4">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant">
+    <div className="flex items-start gap-3 px-4 py-4">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-on-surface-variant">
         <Icon size={19} aria-hidden />
       </span>
       <div className="min-w-0">
@@ -715,19 +667,23 @@ function EmptyBlock({ icon: Icon, title, description }: { icon: LucideIcon; titl
   );
 }
 
-function LoadingBlock({ label }: { label: string }) {
+function LoadingRows() {
+  const { t } = useTranslation();
   return (
-    <div className="space-y-3 rounded-2xl bg-surface px-3 py-4" aria-label={label}>
-      <div className="h-4 w-2/5 animate-pulse rounded bg-surface-container-high" />
-      <div className="h-3 w-3/4 animate-pulse rounded bg-surface-container" />
+    <div className="flex items-center gap-3 px-4 py-4" aria-label={t('profile.business.loading')}>
+      <div className="h-11 w-11 shrink-0 animate-pulse rounded-xl bg-surface-container-high" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-4 w-2/5 animate-pulse rounded bg-surface-container-highest" />
+        <div className="h-3 w-3/4 animate-pulse rounded bg-surface-container-high" />
+      </div>
     </div>
   );
 }
 
-function ErrorBlock({ message }: { message: string }) {
+function ErrorRow({ message }: { message: string }) {
   return (
-    <div className="rounded-2xl bg-error-container p-4 text-on-error-container" role="alert">
-      <p className="font-sans text-body">{message}</p>
-    </div>
+    <p className="px-4 py-4 font-sans text-body text-error" role="alert">
+      {message}
+    </p>
   );
 }
