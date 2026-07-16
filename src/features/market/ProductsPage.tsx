@@ -4,6 +4,7 @@ import { clsx } from 'clsx';
 import { useAffinityGroups } from '@/lib/sports';
 import { MARKET_CATEGORIES, productCategory } from '@/lib/products';
 import { FilterChip } from '@/components/ui/FilterChip';
+import { PageTopBar } from '@/components/layout/PageTopBar';
 import { ProductCard } from './ProductCard';
 import { useMarketProducts, type MarketProduct } from './useMarket';
 
@@ -60,11 +61,14 @@ export function ProductsPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-background pb-8">
+      <PageTopBar
+        title="Mercado"
+        description="Suplementos, treinos, roupas e mais"
+        showBackButton={false}
+      />
       <div className="mx-auto w-full max-w-[720px]">
-        {/* Cabeçalho: título + busca global + atalho para os filtros */}
-        <header className="sticky top-0 z-10 bg-background/95 px-4 pb-3 pt-safe-top backdrop-blur-md">
-          <h1 className="mt-3 font-sans text-title-lg text-on-surface">Produtos</h1>
-          <div className="relative mt-3 flex items-center gap-2">
+        <div className="px-4 pt-4">
+          <div className="relative flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Search
                 size={18}
@@ -95,7 +99,7 @@ export function ProductsPage() {
               <SlidersHorizontal size={18} aria-hidden />
             </button>
           </div>
-        </header>
+        </div>
 
         {/* Corredores do marketplace: entrada rápida por categoria */}
         <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 py-3" aria-label="Categorias">

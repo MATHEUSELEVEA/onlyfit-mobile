@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import {
@@ -10,11 +10,19 @@ import {
   SlidersHorizontal,
   Trophy,
   UsersRound,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAffinityGroups } from '@/lib/sports';
+import {
+  muteAfterAutoplayBlock,
+  setVideoMuted,
+  useVideoMuted,
+} from '@/features/feed/videoSound';
 import { formatCount } from '@/lib/format';
 import { FilterChip } from '@/components/ui/FilterChip';
+import { PageTopBar } from '@/components/layout/PageTopBar';
 import { useToggleCreatorFollow } from '@/features/creators/useCreatorFollow';
 import {
   useExploreCreators,
@@ -113,51 +121,219 @@ function CreatorCard({ creator }: { creator: ExploreCreator }) {
   );
 }
 
-function ContentTile({ item, featured }: { item: ExploreContentItem; featured?: boolean }) {
+// Fração do card que precisa estar visível para disputar o foco do autoplay.
+const AUTOPLAY_VISIBILITY = 0.6;
+
+type RegisterTile = (id: string, node: HTMLElement | null) => void;
+
+function ContentTile({
+  item,
+  featured,
+  active,
+  register,
+}: {
+  item: ExploreContentItem;
+  featured?: boolean;
+  active?: boolean;
+  register: RegisterTile;
+}) {
+  const tileRef = useRef<HTMLElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [failedVideoUrl, setFailedVideoUrl] = useState<string | null>(null);
+  const muted = useVideoMuted();
+  const playing = Boolean(active && item.videoUrl && item.videoUrl !== failedVideoUrl);
+
+  // Só cards com vídeo disputam o foco; thumbnails puras nunca "tocam".
+  useEffect(() => {
+    if (!item.videoUrl) return;
+    register(item.id, tileRef.current);
+    return () => register(item.id, null);
+  }, [item.id, item.videoUrl, register]);
+
+  // Autoplay do card em foco, com o mesmo fallback de mudo do feed: iOS/Safari
+  // barram som sem gesto, então o vídeo cai para mudo e toca assim mesmo.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!playing) {
+      video.pause();
+      return;
+    }
+    video.muted = muted;
+    void video.play().catch(() => {
+      video.muted = true;
+      muteAfterAutoplayBlock();
+      void video.play().catch(() => {});
+    });
+  }, [playing, muted]);
+
   return (
-    <Link
-      to={`/video/${encodeURIComponent(item.id)}`}
+    <article
+      ref={tileRef}
+      data-tile-id={item.id}
       className={clsx(
-        'group relative block overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container',
+        'relative overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container',
         featured ? 'col-span-2 aspect-[16/10]' : 'aspect-square',
       )}
     >
-      {item.thumbnailUrl ? (
-        <img
-          src={item.thumbnailUrl}
-          alt={item.title || `Conteúdo de ${item.creatorName}`}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-active:scale-105"
-        />
-      ) : (
-        <div className="h-full w-full bg-gradient-to-br from-primary/25 to-surface-container-high" />
-      )}
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"
-      />
-
-      {item.hasVideo && (
-        <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
-          <Play size={14} fill="currentColor" aria-label="Vídeo" />
-        </span>
-      )}
-
-      <div className="absolute inset-x-0 bottom-0 p-3 text-white">
-        {item.title && (
-          <p className={clsx('drop-shadow', featured ? 'font-sans text-title' : 'font-sans text-body-sm font-semibold', 'line-clamp-2')}>
-            {item.title}
-          </p>
+      <Link
+        to={`/video/${encodeURIComponent(item.id)}`}
+        className="group block h-full w-full"
+        aria-label={`Abrir ${item.title || `conteúdo de ${item.creatorName}`}`}
+      >
+        {item.thumbnailUrl ? (
+          <img
+            src={item.thumbnailUrl}
+            alt={item.title || `Conteúdo de ${item.creatorName}`}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-active:scale-105 motion-reduce:transition-none"
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-primary/25 to-surface-container-high" />
         )}
-        <p className="mt-0.5 flex items-center gap-2 font-sans text-counter font-normal text-white/85">
-          <span className="truncate">{item.creatorName}</span>
-          <span className="inline-flex shrink-0 items-center gap-0.5">
-            <Heart size={11} fill="currentColor" aria-hidden /> {formatCount(item.likes)}
+
+        {/* A thumbnail também é o poster, evitando uma piscada ao iniciar. */}
+        {playing && (
+          <video
+            ref={videoRef}
+            src={item.videoUrl ?? undefined}
+            poster={item.thumbnailUrl ?? undefined}
+            className="absolute inset-0 h-full w-full object-cover"
+            loop
+            playsInline
+            muted={muted}
+            preload="metadata"
+            onError={() => setFailedVideoUrl(item.videoUrl)}
+          />
+        )}
+
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"
+        />
+
+        {item.hasVideo && !playing && (
+          <span
+            aria-hidden
+            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]"
+          >
+            <Play size={14} fill="currentColor" />
           </span>
-        </p>
-      </div>
-    </Link>
+        )}
+
+        <div className="absolute inset-x-0 bottom-0 p-3 text-white">
+          {item.title && (
+            <p className={clsx('drop-shadow', featured ? 'font-sans text-title' : 'font-sans text-body-sm font-semibold', 'line-clamp-2')}>
+              {item.title}
+            </p>
+          )}
+          <p className="mt-0.5 flex items-center gap-2 font-sans text-counter font-normal text-white/85">
+            <span className="truncate">{item.creatorName}</span>
+            <span className="inline-flex shrink-0 items-center gap-0.5">
+              <Heart size={11} fill="currentColor" aria-hidden /> {formatCount(item.likes)}
+            </span>
+          </p>
+        </div>
+      </Link>
+
+      {/* Ação irmã do link: evita controles interativos aninhados. */}
+      {playing && (
+        <button
+          type="button"
+          onClick={() => setVideoMuted(!muted)}
+          aria-label={muted ? 'Ativar som' : 'Desativar som'}
+          aria-pressed={!muted}
+          className="absolute right-1 top-1 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-lowest/60 text-on-surface backdrop-blur-sm transition-transform active:scale-95"
+        >
+          {muted ? <VolumeX size={20} aria-hidden /> : <Volume2 size={20} aria-hidden />}
+        </button>
+      )}
+    </article>
+  );
+}
+
+// Grade de conteúdo com preview estilo TikTok/Instagram: um IntersectionObserver
+// acompanha quais cards com vídeo estão visíveis e elege o mais centralizado
+// para tocar — um por vez. Respeita "reduzir movimento": aí nada toca sozinho.
+function ContentGrid({ items }: { items: ExploreContentItem[] }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const ratiosRef = useRef(new Map<string, number>());
+  const nodesRef = useRef(new Map<string, HTMLElement>());
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  const selectActive = useCallback(() => {
+    if (document.visibilityState !== 'visible') {
+      setActiveId(null);
+      return;
+    }
+
+    let best: string | null = null;
+    let shortestDistance = Number.POSITIVE_INFINITY;
+    const viewportCenter = window.innerHeight / 2;
+    ratiosRef.current.forEach((ratio, id) => {
+      if (ratio < AUTOPLAY_VISIBILITY) return;
+      const node = nodesRef.current.get(id);
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
+      if (distance >= shortestDistance) return;
+      best = id;
+      shortestDistance = distance;
+    });
+    setActiveId(best);
+  }, []);
+
+  const register = useCallback<RegisterTile>((id, node) => {
+    const nodes = nodesRef.current;
+    const existing = nodes.get(id);
+    if (existing && existing !== node) observerRef.current?.unobserve(existing);
+    if (node) {
+      nodes.set(id, node);
+      observerRef.current?.observe(node);
+    } else {
+      nodes.delete(id);
+      ratiosRef.current.delete(id);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).dataset.tileId;
+          if (id) ratiosRef.current.set(id, entry.isIntersecting ? entry.intersectionRatio : 0);
+        }
+        selectActive();
+      },
+      { threshold: [0, 0.25, 0.5, 0.6, 0.75, 0.9, 1] },
+    );
+    observerRef.current = io;
+    // Cards já montados (effects filhos rodam antes deste) entram agora.
+    nodesRef.current.forEach((node) => io.observe(node));
+    document.addEventListener('visibilitychange', selectActive);
+    window.addEventListener('resize', selectActive);
+    return () => {
+      io.disconnect();
+      observerRef.current = null;
+      document.removeEventListener('visibilitychange', selectActive);
+      window.removeEventListener('resize', selectActive);
+    };
+  }, [selectActive]);
+
+  return (
+    <section className="mt-4 grid grid-cols-2 gap-2 px-4" aria-label="Conteúdos">
+      {items.map((item, index) => (
+        <ContentTile
+          key={item.id}
+          item={item}
+          featured={index === 0}
+          active={activeId === item.id}
+          register={register}
+        />
+      ))}
+    </section>
   );
 }
 
@@ -358,11 +534,14 @@ export function ExplorePage() {
 
   return (
     <div className="h-full overflow-y-auto bg-background pb-8">
+      <PageTopBar
+        title="Explorar"
+        description="Conteúdos, pessoas, desafios e comunidades"
+        showBackButton={false}
+      />
       <div className="mx-auto w-full max-w-[720px]">
-        {/* Cabeçalho: título + busca global + atalho para os filtros */}
-        <header className="sticky top-0 z-10 bg-background/95 px-4 pb-3 pt-safe-top backdrop-blur-md">
-          <h1 className="mt-3 font-sans text-title-lg text-on-surface">Explorar</h1>
-          <div className="relative mt-3 flex items-center gap-2">
+        <div className="px-4 pt-4">
+          <div className="relative flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Search
                 size={18}
@@ -422,7 +601,7 @@ export function ExplorePage() {
               </button>
             ))}
           </div>
-        </header>
+        </div>
 
         {filtersOpen && (
           <>
@@ -505,11 +684,7 @@ export function ExplorePage() {
           <>
             {/* Conteúdo gratuito em mosaico (padrão explore_hub) */}
             {tab === 'content' && content.length > 0 && (
-              <section className="mt-4 grid grid-cols-2 gap-2 px-4" aria-label="Conteúdos">
-                {content.map((item, index) => (
-                  <ContentTile key={item.id} item={item} featured={index === 0} />
-                ))}
-              </section>
+              <ContentGrid items={content} />
             )}
 
             {tab === 'people' && creators.length > 0 && (
