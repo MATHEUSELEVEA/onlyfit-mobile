@@ -3,7 +3,8 @@ import { BackButton } from '@/components/ui/BackButton';
 
 /**
  * Barra de topo padrão com título, descrição opcional e botão de voltar quando necessário.
- * Usada pelas telas navegáveis simples (Meu Fit, Treino, Dieta).
+ * Usada pelas telas do menu inferior e navegáveis simples (Meu Fit, Explorar, Mercado, Treino, Dieta).
+ * Só título (+ descrição); busca e demais controles ficam no corpo da página.
  */
 export function PageTopBar({
   title,

@@ -101,6 +101,8 @@ export interface ExploreContentItem {
   title: string;
   thumbnailUrl: string | null;
   hasVideo: boolean;
+  /** URL do vídeo, quando houver — usada para o preview em autoplay na grade. */
+  videoUrl: string | null;
   likes: number;
   creatorId: string;
   creatorName: string;
@@ -154,6 +156,7 @@ export function useExploreContent() {
           title: row.title ?? '',
           thumbnailUrl: row.thumbnail_url,
           hasVideo: Boolean(row.video_url),
+          videoUrl: row.video_url,
           likes: row.likes ?? 0,
           creatorId: row.creator_id,
           creatorName: profile?.full_name || profile?.username || 'Usuário',
