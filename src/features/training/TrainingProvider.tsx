@@ -1,13 +1,18 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
 export type TrainingStatus = 'planned' | 'active' | 'partial' | 'completed' | 'missed' | 'imported' | 'rest';
-export type TrainingSurface = 'strength' | 'running' | 'cycling';
+export type TrainingSurface = 'strength' | 'running' | 'cycling' | 'walking' | 'swimming' | 'functional' | 'hiit' | 'yoga' | 'pilates' | 'other';
+export type ActivitySource = 'onlyfit' | 'manual' | 'apple_health' | 'garmin' | 'strava' | 'coros' | 'fitbit';
 
 export interface ExerciseSetLog { weight: number; reps: number; rpe: number | null; rir: number | null; completed: boolean; }
 export interface WorkoutExercise { id: string; name: string; muscle: string; sets: number; targetReps: string; lastWeight: number; technique: string; demoLabel: string; }
 export interface WorkoutTemplate { id: string; title: string; focus: string; durationMin: number; exercises: WorkoutExercise[]; }
 export interface ScheduledWorkout { id: string; date: string; templateId?: string; title: string; focus: string; durationMin: number; status: TrainingStatus; surface: TrainingSurface; summary?: string; }
-export interface ImportedActivity { id: string; date: string; title: string; durationMin: number; surface: 'running' | 'cycling'; source: 'Apple Health'; }
+/** Boundary for future HealthKit/wearable adapters. External data never becomes a prescribed workout. */
+export interface ImportedActivity {
+  id: string; date: string; title: string; durationMin: number; surface: TrainingSurface; source: ActivitySource;
+  externalId?: string; startedAt?: string; distanceKm?: number; calories?: number; averageHeartRate?: number; elevationM?: number;
+}
 export interface WorkoutSession { id: string; scheduledId: string; templateId: string; startedAt: number; activeExercise: number; logs: Record<string, ExerciseSetLog[]>; note: string; }
 
 interface TrainingContextValue {
@@ -45,7 +50,7 @@ const initialScheduled: ScheduledWorkout[] = [
   { id: 'rest', date: day(2), title: 'Descanso', focus: 'Recuperação', durationMin: 0, status: 'rest', surface: 'strength' },
 ];
 
-const initialImported: ImportedActivity[] = [{ id: 'run', date: day(-2), title: 'Corrida ao ar livre', durationMin: 34, surface: 'running', source: 'Apple Health' }];
+const initialImported: ImportedActivity[] = [{ id: 'run', date: day(-2), title: 'Corrida ao ar livre', durationMin: 34, surface: 'running', source: 'apple_health', externalId: 'healthkit-demo-run-01', distanceKm: 5.2, averageHeartRate: 146 }];
 
 export function TrainingProvider({ children }: { children: ReactNode }) {
   const [scheduled, setScheduled] = useState(initialScheduled);
