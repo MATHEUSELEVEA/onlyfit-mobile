@@ -12,6 +12,7 @@ export interface ScheduledWorkout { id: string; date: string; templateId?: strin
 export interface ImportedActivity {
   id: string; date: string; title: string; durationMin: number; surface: TrainingSurface; source: ActivitySource;
   externalId?: string; startedAt?: string; distanceKm?: number; calories?: number; averageHeartRate?: number; elevationM?: number;
+  importedFromWatch?: boolean;
 }
 export interface WorkoutSession { id: string; scheduledId: string; templateId: string; startedAt: number; activeExercise: number; logs: Record<string, ExerciseSetLog[]>; note: string; }
 
