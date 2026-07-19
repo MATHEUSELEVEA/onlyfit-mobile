@@ -65,4 +65,5 @@ export interface WearableActivity {
   calories?: number;
   averageHeartRate?: number;
   elevationM?: number;
+  importedFromWatch?: boolean;
 }

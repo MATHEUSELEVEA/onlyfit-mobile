@@ -176,6 +176,19 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func mapWorkout(_ workout: HKWorkout, heartRate: (avg: Double?, max: Double?)) -> [String: Any] {
         let mapped = mapActivityType(workout.workoutActivityType)
+        let deviceName = workout.device?.name ?? ""
+        let deviceModel = workout.device?.model ?? ""
+        let deviceManufacturer = workout.device?.manufacturer ?? ""
+        let sourceName = workout.sourceRevision.source.name
+        let bundleIdentifier = workout.sourceRevision.source.bundleIdentifier
+        let watchMarkers = [
+            deviceName,
+            deviceModel,
+            deviceManufacturer,
+            sourceName,
+            bundleIdentifier
+        ].joined(separator: " ").lowercased()
+        let isAppleWatch = watchMarkers.contains("apple watch") || watchMarkers.contains("watch")
         var row: [String: Any] = [
             "provider_activity_id": workout.uuid.uuidString,
             "sport": mapped.sport,
@@ -186,9 +199,14 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
             "ended_at": isoFormatter.string(from: workout.endDate),
             "duration_s": Int(workout.duration),
             "source_payload": [
-                "source_name": workout.sourceRevision.source.name,
-                "bundle_identifier": workout.sourceRevision.source.bundleIdentifier,
-                "activity_type_raw": workout.workoutActivityType.rawValue
+                "source_name": sourceName,
+                "bundle_identifier": bundleIdentifier,
+                "activity_type_raw": workout.workoutActivityType.rawValue,
+                "device_name": deviceName,
+                "device_model": deviceModel,
+                "device_manufacturer": deviceManufacturer,
+                "device_type": isAppleWatch ? "apple_watch" : "ios",
+                "is_apple_watch": isAppleWatch
             ]
         ]
 

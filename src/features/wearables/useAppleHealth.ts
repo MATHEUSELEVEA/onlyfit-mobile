@@ -24,6 +24,7 @@ type ExternalActivityRow = {
   elevation_gain_m: number | null;
   avg_hr: number | null;
   calories: number | null;
+  source_payload: Record<string, unknown> | null;
 };
 
 type DailySummaryRow = {
@@ -79,6 +80,19 @@ function labelFromSport(sport: string) {
   } as Record<string, string>)[sport] ?? 'Atividade';
 }
 
+function isAppleWatchPayload(payload: Record<string, unknown> | null | undefined) {
+  if (!payload) return false;
+  if (payload.is_apple_watch === true || payload.device_type === 'apple_watch') return true;
+  const values = [
+    payload.source_name,
+    payload.bundle_identifier,
+    payload.device_name,
+    payload.device_model,
+    payload.device_manufacturer,
+  ];
+  return values.some((value) => typeof value === 'string' && /apple\s*watch|watch/i.test(value));
+}
+
 function toWearableActivity(row: ExternalActivityRow): WearableActivity {
   return {
     id: row.id,
@@ -93,6 +107,7 @@ function toWearableActivity(row: ExternalActivityRow): WearableActivity {
     calories: row.calories ? Math.round(row.calories) : undefined,
     averageHeartRate: row.avg_hr ? Math.round(row.avg_hr) : undefined,
     elevationM: row.elevation_gain_m ? Math.round(row.elevation_gain_m) : undefined,
+    importedFromWatch: isAppleWatchPayload(row.source_payload),
   };
 }
 
@@ -150,7 +165,7 @@ export function useAppleHealth() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('external_activities')
-        .select('id,provider_activity_id,sport,title,started_at,duration_s,distance_m,elevation_gain_m,avg_hr,calories')
+        .select('id,provider_activity_id,sport,title,started_at,duration_s,distance_m,elevation_gain_m,avg_hr,calories,source_payload')
         .eq('provider', 'healthkit')
         .is('deleted_at', null)
         .order('started_at', { ascending: false })
