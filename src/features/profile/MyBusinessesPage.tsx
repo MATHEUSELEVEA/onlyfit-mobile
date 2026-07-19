@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslation } from '@/i18n/I18nProvider';
+import { intlLocaleFromLanguage, useTranslation, type TranslationKey } from '@/i18n/I18nProvider';
 import { supabase } from '@/lib/supabase';
 import { useAffinityGroups } from '@/lib/sports';
 import { myProfileQueryKey, useMyProfile, type MyProfile } from './useMyProfile';
@@ -53,19 +53,19 @@ interface BusinessConnection {
 
 type BusinessTab = 'owned' | 'invited';
 
-const businessKindLabel: Record<string, string> = {
-  professional_consultancy: 'Consultoria',
-  sports_consultancy: 'Assessoria',
-  content_creator: 'Criador',
-  brand: 'Loja/Marca',
-  facility: 'Local',
-  business: 'Negócio',
+const businessKindLabelKey: Record<string, TranslationKey> = {
+  professional_consultancy: 'profile.business.kind.professionalConsultancy',
+  sports_consultancy: 'profile.business.kind.sportsConsultancy',
+  content_creator: 'profile.business.kind.contentCreator',
+  brand: 'profile.business.kind.brand',
+  facility: 'profile.business.kind.facility',
+  business: 'profile.business.kind.business',
 };
 
-const businessStatusLabel: Record<string, string> = {
-  draft: 'Rascunho',
-  published: 'Publicado',
-  suspended: 'Suspenso',
+const businessStatusLabelKey: Record<string, TranslationKey> = {
+  draft: 'profile.business.status.draft',
+  published: 'profile.business.status.published',
+  suspended: 'profile.business.status.suspended',
 };
 
 export function MyBusinessesPage() {
@@ -140,7 +140,7 @@ export function MyBusinessesPage() {
 
   const dateFormatter = useMemo(
     () =>
-      new Intl.DateTimeFormat(language === 'pt' ? 'pt-BR' : 'en-US', {
+      new Intl.DateTimeFormat(intlLocaleFromLanguage(language), {
         month: 'short',
         year: 'numeric',
       }),
@@ -247,8 +247,12 @@ export function MyBusinessesPage() {
                         name={business.name}
                         logoUrl={business.logo_url}
                         verified={business.verified}
-                        meta={businessMeta(business, dateFormatter, labelFor)}
-                        badge={business.status ? businessStatusLabel[business.status] ?? business.status : null}
+                        meta={businessMeta(business, dateFormatter, labelFor, t)}
+                        badge={
+                          business.status
+                            ? t(businessStatusLabelKey[business.status] ?? 'profile.business.status.draft')
+                            : null
+                        }
                         verifiedLabel={t('profile.business.verified')}
                       />
                     ))}
@@ -375,17 +379,18 @@ function businessMeta(
   business: BusinessRow,
   dateFormatter: Intl.DateTimeFormat,
   labelFor: (key: string) => string,
+  t: (key: TranslationKey) => string,
 ) {
   const createdAt = business.created_at ? dateFormatter.format(new Date(business.created_at)) : null;
   const sports = (business.sports ?? []).map(labelFor).join(', ');
   const kind =
     business.business_type === 'independent'
-      ? 'Negócio independente'
+      ? t('profile.business.kind.independent')
       : business.business_type === 'company'
-        ? 'Negócio empresarial'
+        ? t('profile.business.kind.company')
         : business.kind
-          ? businessKindLabel[business.kind] ?? business.kind
-          : 'Negócio';
+          ? t(businessKindLabelKey[business.kind] ?? 'profile.business.kind.business')
+          : t('profile.business.kind.business');
   return [kind, sports, createdAt].filter(Boolean).join(' · ');
 }
 

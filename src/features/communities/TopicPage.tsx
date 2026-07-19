@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { Flag, Loader2, Lock, LockOpen, Pin, PinOff, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslation } from '@/i18n/I18nProvider';
+import { intlLocaleFromLanguage, useTranslation } from '@/i18n/I18nProvider';
 import { PageTopBar } from '@/components/layout/PageTopBar';
 import { useCommunity, useMyMembership } from './useCommunity';
 import {
@@ -47,7 +47,7 @@ export function TopicPage() {
 
   const dateFormatter = useMemo(
     () =>
-      new Intl.DateTimeFormat(language === 'pt' ? 'pt-BR' : 'en-US', {
+      new Intl.DateTimeFormat(intlLocaleFromLanguage(language), {
         day: '2-digit',
         month: 'short',
         hour: '2-digit',

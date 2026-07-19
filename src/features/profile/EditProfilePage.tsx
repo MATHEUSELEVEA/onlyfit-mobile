@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Check, Loader2, MapPin, Plus, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslation, SUPPORTED_LANGUAGES, type LanguageCode } from '@/i18n/I18nProvider';
+import {
+  normalizeLanguageCode,
+  SUPPORTED_LANGUAGES,
+  useTranslation,
+  type LanguageCode,
+} from '@/i18n/I18nProvider';
 import { COUNTRY_OPTIONS, countryName } from '@/lib/countries';
 import { formatCpf, isValidCpf, normalizeCpf } from '@/lib/cpf';
 import { formatCep } from '@/lib/masks';
@@ -60,7 +65,7 @@ export function EditProfilePage() {
           <PersonalDataForm key={profile.userId} profile={profile} sensitive={sensitive} />
         ) : (
           <div className="flex min-h-[200px] items-center justify-center">
-            <Loader2 size={24} className="animate-spin text-primary" aria-label="Carregando" />
+            <Loader2 size={24} className="animate-spin text-primary" aria-label={t('common.loading')} />
           </div>
         )}
       </div>
@@ -69,7 +74,7 @@ export function EditProfilePage() {
 }
 
 function PersonalDataForm({ profile, sensitive }: { profile: MyProfile; sensitive: SensitiveProfile }) {
-  const { t } = useTranslation();
+  const { t, setLanguage: setAppLanguage } = useTranslation();
   const { session } = useAuth();
   const userId = session?.user.id;
   const updateProfile = useUpdateProfile();
@@ -79,7 +84,7 @@ function PersonalDataForm({ profile, sensitive }: { profile: MyProfile; sensitiv
   const [username, setUsername] = useState(profile.username ?? '');
   const [bio, setBio] = useState(profile.bio ?? '');
   const [countryCode, setCountryCode] = useState(profile.countryCode ?? 'BR');
-  const [language, setLanguage] = useState<LanguageCode>((profile.language as LanguageCode) ?? 'pt');
+  const [language, setLanguage] = useState<LanguageCode>(normalizeLanguageCode(profile.language));
   const [phone, setPhone] = useState(sensitive.phone ?? '');
   const [cpf, setCpfValue] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -162,8 +167,12 @@ function PersonalDataForm({ profile, sensitive }: { profile: MyProfile; sensitiv
               <SelectField
                 label={t('editProfile.language')}
                 value={language}
-                onChange={(value) => setLanguage(value as LanguageCode)}
-                options={SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+                onChange={(value) => {
+                  const nextLanguage = normalizeLanguageCode(value);
+                  setLanguage(nextLanguage);
+                  setAppLanguage(nextLanguage);
+                }}
+                options={SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.nativeName }))}
               />
             </div>
           </div>
