@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from 'lucide-react';
-import { useTranslation } from '@/i18n/I18nProvider';
+import { intlLocaleFromLanguage, useTranslation } from '@/i18n/I18nProvider';
 import type { LegalDocument } from './legalDocuments';
 import {
   useAcceptLegalDocument,
@@ -30,7 +30,7 @@ interface LegalDocumentState {
 }
 
 export function PrivacyTermsPage() {
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
   const [checkedByKey, setCheckedByKey] = useState<Record<string, boolean>>({});
   const {
     data: legalDocuments = [],
@@ -81,7 +81,7 @@ export function PrivacyTermsPage() {
 
   const dateFormatter = useMemo(
     () =>
-      new Intl.DateTimeFormat(language === 'pt' ? 'pt-BR' : 'en-US', {
+      new Intl.DateTimeFormat(intlLocaleFromLanguage(language), {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -108,17 +108,17 @@ export function PrivacyTermsPage() {
           <div className="flex items-center gap-2.5">
             <Link
               to="/perfil"
-              aria-label="Voltar para o perfil"
+              aria-label={t('privacyTerms.back')}
               className="-ml-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface transition-colors active:bg-surface-container-high"
             >
               <ArrowLeft size={21} aria-hidden />
             </Link>
             <div className="min-w-0">
               <h1 className="truncate font-sans text-title-lg text-on-surface">
-                Privacidade e Termos
+                {t('privacyTerms.title')}
               </h1>
               <p className="font-sans text-body-sm text-on-surface-variant">
-                Documentos vigentes e aceites obrigatórios.
+                {t('privacyTerms.subtitle')}
               </p>
             </div>
           </div>
@@ -190,22 +190,26 @@ function ProgressSummary({
   total: number;
   pending: number;
 }) {
+  const { t } = useTranslation();
   const pct = total > 0 ? Math.round((accepted / total) * 100) : 0;
   const allDone = pending === 0;
+  const pendingLabel = t(pending === 1 ? 'privacyTerms.pendingCount' : 'privacyTerms.pendingCountPlural', {
+    count: pending,
+  });
 
   return (
     <div className="mt-4 rounded-2xl bg-surface-container p-3.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-sans text-label text-on-surface-variant">Aceites registrados</span>
+        <span className="font-sans text-label text-on-surface-variant">{t('privacyTerms.acceptedSummary')}</span>
         {allDone ? (
           <span className="inline-flex items-center gap-1 font-sans text-label text-primary">
             <ShieldCheck size={15} aria-hidden />
-            Tudo em dia
+            {t('privacyTerms.allCurrent')}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary-container px-2.5 py-0.5 font-sans text-counter text-on-secondary-container">
             <Clock3 size={13} aria-hidden />
-            {pending} pendente{pending > 1 ? 's' : ''}
+            {pendingLabel}
           </span>
         )}
       </div>
@@ -216,7 +220,7 @@ function ProgressSummary({
           aria-valuenow={accepted}
           aria-valuemin={0}
           aria-valuemax={total}
-          aria-label={`${accepted} de ${total} documentos assinados`}
+          aria-label={t('privacyTerms.progressAria', { accepted, total })}
         >
           <div
             className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out motion-reduce:transition-none"
@@ -246,6 +250,7 @@ function PendingCard({
   onCheckedChange: (next: boolean) => void;
   onAccept: () => void;
 }) {
+  const { t } = useTranslation();
   const { document, status, latestAcceptance } = item;
 
   return (
@@ -259,11 +264,11 @@ function PendingCard({
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h2 className="font-sans text-body font-semibold text-on-surface">{document.title}</h2>
               <span className="inline-flex items-center rounded-full bg-secondary-container px-2 py-0.5 font-sans text-counter text-on-secondary-container">
-                {status === 'new_version' ? 'Nova versão' : 'Pendente'}
+                {status === 'new_version' ? t('privacyTerms.newVersion') : t('privacyTerms.pending')}
               </span>
             </div>
             <p className="mt-0.5 font-sans text-body-sm text-on-surface-variant">
-              Versão {document.version}
+              {t('privacyTerms.version', { version: document.version })}
             </p>
           </div>
         </div>
@@ -274,16 +279,16 @@ function PendingCard({
 
         {status === 'new_version' && latestAcceptance && (
           <p className="mt-3 rounded-xl bg-surface-container-high px-3 py-2 font-sans text-body-sm text-on-surface-variant">
-            Você aceitou uma versão anterior — esta atualização exige nova confirmação.
+            {t('privacyTerms.newVersionHint')}
           </p>
         )}
 
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
           <DocLink icon={ExternalLink} href={document.pdfPath} download={false}>
-            Abrir PDF
+            {t('privacyTerms.openPdf')}
           </DocLink>
           <DocLink icon={Download} href={document.pdfPath} download>
-            Baixar
+            {t('privacyTerms.download')}
           </DocLink>
         </div>
       </div>
@@ -302,7 +307,7 @@ function PendingCard({
         {acceptError && (
           <p role="alert" className="mt-2.5 flex items-center gap-1.5 font-sans text-body-sm text-error">
             <TriangleAlert size={15} aria-hidden />
-            Não foi possível registrar agora. Tente novamente.
+            {t('privacyTerms.acceptError')}
           </p>
         )}
 
@@ -331,6 +336,7 @@ function AcceptedCard({
   item: LegalDocumentState;
   acceptedAtLabel: string | null;
 }) {
+  const { t } = useTranslation();
   const { document } = item;
 
   return (
@@ -343,14 +349,17 @@ function AcceptedCard({
           {document.title}
         </h2>
         <p className="truncate font-sans text-body-sm text-on-surface-variant">
-          {acceptedAtLabel ? `Assinado em ${acceptedAtLabel}` : 'Assinado'} · v{document.version}
+          {acceptedAtLabel
+            ? t('privacyTerms.signedAt', { date: acceptedAtLabel })
+            : t('privacyTerms.signed')}{' '}
+          · v{document.version}
         </p>
       </div>
       <a
         href={document.pdfPath}
         target="_blank"
         rel="noreferrer"
-        aria-label={`Abrir PDF de ${document.title}`}
+        aria-label={t('privacyTerms.openPdfFor', { title: document.title })}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:text-on-surface active:bg-surface-container-high"
       >
         <ExternalLink size={18} aria-hidden />
@@ -385,23 +394,24 @@ function DocLink({
 }
 
 function ErrorBlock({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl bg-surface-container-low px-6 py-10 text-center">
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-error-container text-on-error-container">
         <TriangleAlert size={20} aria-hidden />
       </span>
       <h2 className="mt-3 font-sans text-body font-semibold text-on-surface">
-        Não foi possível carregar
+        {t('privacyTerms.loadErrorTitle')}
       </h2>
       <p className="mt-1 max-w-[34ch] font-sans text-body-sm text-on-surface-variant">
-        Verifique sua conexão e tente novamente.
+        {t('privacyTerms.loadErrorDescription')}
       </p>
       <button
         type="button"
         onClick={onRetry}
         className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary active:scale-[0.98]"
       >
-        Tentar novamente
+        {t('privacyTerms.retry')}
       </button>
     </div>
   );
@@ -433,16 +443,17 @@ function SkeletonList() {
 }
 
 function EmptyBlock() {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl bg-surface-container-low px-6 py-12 text-center">
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
         <FileText size={20} aria-hidden />
       </span>
       <h2 className="mt-3 font-sans text-body font-semibold text-on-surface">
-        Nenhum documento vigente
+        {t('privacyTerms.emptyTitle')}
       </h2>
       <p className="mt-1 max-w-[34ch] font-sans text-body-sm text-on-surface-variant">
-        Quando houver termos a assinar, eles aparecerão aqui.
+        {t('privacyTerms.emptyDescription')}
       </p>
     </div>
   );

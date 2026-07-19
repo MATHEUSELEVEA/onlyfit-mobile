@@ -1,14 +1,23 @@
-import type { LanguageCode } from '@/i18n/I18nProvider';
+import {
+  intlLocaleFromLanguage,
+  normalizeLanguageCode,
+  type LanguageCode,
+} from '@/i18n/I18nProvider';
+import { dictionaries } from '@/i18n/translations';
 
 function locale(language: LanguageCode): string {
-  return language === 'en' ? 'en-US' : 'pt-BR';
+  return intlLocaleFromLanguage(language);
+}
+
+function translateTime(key: 'messages.time.now', language: LanguageCode): string {
+  return dictionaries[normalizeLanguageCode(language)][key];
 }
 
 /** Rótulo relativo curto para a lista de conversas (agora, 5min, 3h, 2d, data). */
 export function timeAgo(dateStr: string, language: LanguageCode): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return language === 'en' ? 'now' : 'agora';
+  if (mins < 1) return translateTime('messages.time.now', language);
   if (mins < 60) return `${mins}min`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h`;
