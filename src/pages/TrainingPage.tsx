@@ -42,7 +42,7 @@ function formatActivityMeta(activity: { durationMin: number; source: string; dis
 
 function WatchOriginChip() {
   return (
-    <span className="inline-flex min-h-6 shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">
+    <span className="inline-flex min-h-6 shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 font-sans text-counter text-primary">
       <Watch size={12} aria-hidden />
       Watch
     </span>
@@ -91,9 +91,12 @@ function Agenda({ selectedDate, onDate, items, imported, active, onCalendar, onR
 
 function AppleHealthCard({ appleHealth, compact }: { appleHealth: AppleHealthState; compact?: boolean }) {
   const { t } = useTranslation();
-  const connected = appleHealth.connection?.status === 'connected';
+  const hasImportedData = appleHealth.importedActivities.length > 0 || appleHealth.dailySummaries.length > 0;
+  const hasCompletedSync = Boolean(appleHealth.connection?.last_sync_at) || hasImportedData;
+  const connected = appleHealth.connection?.status === 'connected' && hasCompletedSync;
+  const waitingForNativeState = appleHealth.isNativeIos && appleHealth.isLoading && !appleHealth.connection;
   const unavailable = !appleHealth.available && !appleHealth.isLoading;
-  if (!connected && !appleHealth.isNativeIos) return null;
+  if (!connected && !waitingForNativeState && !appleHealth.isNativeIos) return null;
   const syncing = appleHealth.sync.isPending;
   const lastSync = appleHealth.connection?.last_sync_at
     ? new Date(appleHealth.connection.last_sync_at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -109,11 +112,13 @@ function AppleHealthCard({ appleHealth, compact }: { appleHealth: AppleHealthSta
           <Watch size={18} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
               <h2 className="font-sans text-label text-on-surface">{t('health.apple.title')}</h2>
               <p className="mt-0.5 font-sans text-body-sm text-on-surface-variant">
-                {unavailable
+                {waitingForNativeState
+                  ? t('common.loading')
+                  : unavailable
                   ? (appleHealth.availabilityReason || t('health.apple.unavailable'))
                   : connected
                     ? `${t('health.apple.connected')}${lastSync ? ` · ${lastSync}` : ''}`
@@ -132,7 +137,7 @@ function AppleHealthCard({ appleHealth, compact }: { appleHealth: AppleHealthSta
             ) : null}
           </div>
 
-          {!connected && !unavailable ? (
+          {!connected && !unavailable && !waitingForNativeState ? (
             <div className="mt-4 space-y-3">
               <label className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/35 bg-surface px-3 py-3">
                 <span className="font-sans text-body-sm text-on-surface">{t('health.apple.shareWithCoach')}</span>
@@ -264,7 +269,7 @@ function AddActivitySheet({
                 className={clsx(
                   'flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-xl border font-sans text-counter',
                   surface === item.value
-                    ? 'border-primary bg-primary text-on-primary shadow-[0_0_0_1px_rgba(188,255,0,0.22)]'
+                    ? 'border-primary bg-primary text-on-primary'
                     : 'border-outline-variant/35 bg-surface-container text-on-surface-variant',
                 )}
               >

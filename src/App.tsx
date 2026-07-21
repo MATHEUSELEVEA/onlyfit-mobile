@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { queryClient } from './lib/queryClient';
 import { ThemeProvider } from './theme/ThemeProvider';
@@ -46,6 +47,7 @@ import { HealthEventDetailPage } from './features/health/HealthEventDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { AuthConfirmPage } from './pages/AuthConfirmPage';
+import { registerCapacitorAppBridge } from './lib/capacitorAppBridge';
 
 function AuthenticatedApp() {
   const { session, loading } = useAuth();
@@ -120,6 +122,14 @@ function AuthenticatedApp() {
   );
 }
 
+function NativeAppBridge() {
+  const navigate = useNavigate();
+
+  useEffect(() => registerCapacitorAppBridge(navigate), [navigate]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -127,6 +137,7 @@ export default function App() {
         <I18nProvider>
           <AuthProvider>
             <BrowserRouter>
+              <NativeAppBridge />
               <TrainingProvider>
                 <AuthenticatedApp />
               </TrainingProvider>

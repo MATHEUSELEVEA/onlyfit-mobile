@@ -4,11 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { useFeed } from './useFeed';
 import { PostCard } from './PostCard';
 import { FeedSportsBar } from './FeedSportsBar';
-
-// Quantos vizinhos do post visível ficam montados de verdade. Como no TikTok,
-// só o atual e os adjacentes existem — o resto vira palco vazio, senão cada
-// <video> da lista bufferiza junto e o scroll engasga em aparelho modesto.
-const MOUNT_WINDOW = 1;
+import { useActiveStoryItems } from '@/features/stories/useActiveStoryItems';
+import { mergeFeedEntries } from '@/features/stories/feedMerge';
+import { StoryCard } from '@/features/stories/StoryCard';
 
 // Arrasto (px) além do qual soltar dispara o refresh.
 const PULL_THRESHOLD = 56;
@@ -48,7 +46,11 @@ export function FeedPage() {
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data]);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Story não tem tela própria: entra misturado no mesmo scroll dos posts, na
+  // mesma ordenação por data — a única diferença visual é o card ter o
+  // relógio de tempo restante em vez do trilho de ações (ver StoryCard).
+  const { data: storyItems } = useActiveStoryItems();
+  const entries = useMemo(() => mergeFeedEntries(posts, storyItems ?? []), [posts, storyItems]);
 
   // Pull-to-refresh: distância atual do arrasto (0 = solto).
   const [pull, setPull] = useState(0);
@@ -66,13 +68,10 @@ export function FeedPage() {
   }, [isLoading, posts.length, hasNextPage, loadMore]);
 
   // Busca a próxima página com dois posts de antecedência, para a rolagem não
-  // esbarrar no fim da lista — e acompanha qual post está visível para a
-  // janela de montagem.
+  // esbarrar no fim da lista.
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const el = event.currentTarget;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 2) loadMore();
-    const next = Math.round(el.scrollTop / el.clientHeight);
-    setCurrentIndex((prev) => (prev === next ? prev : next));
   };
 
   // Pull-to-refresh manual: o container tem snap obrigatório e overscroll
@@ -183,9 +182,12 @@ export function FeedPage() {
           </div>
         )}
 
-        {posts.map((post, index) => (
-          <div key={post.id} className="h-full snap-start snap-always">
-            {Math.abs(index - currentIndex) <= MOUNT_WINDOW && <PostCard post={post} />}
+        {entries.map((entry) => (
+          <div key={entry.id} className="h-full snap-start snap-always">
+            {/* Mantemos os itens já percorridos no DOM. A mídia inativa não
+                faz preload nem toca, mas o usuário pode voltar a qualquer
+                reel sem encontrar um palco vazio. */}
+            {entry.kind === 'post' ? <PostCard post={entry.post} /> : <StoryCard story={entry.story} />}
           </div>
         ))}
       </div>

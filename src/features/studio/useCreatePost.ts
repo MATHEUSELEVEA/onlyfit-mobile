@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { captureVideoPoster, uploadAsset } from './upload';
-import { fileExtension, type DraftMedia } from './media';
+import { contentTypeForMedia, fileExtension, type DraftMedia } from './media';
 import type { MyProfile } from '@/features/profile/useMyProfile';
 import type { FeedPost } from '@/features/feed/types';
 
@@ -29,13 +29,25 @@ function errorCode(error: unknown): string {
   return String((error as SupabasePostError).code ?? '');
 }
 
+function errorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object') return '';
+  return String((error as SupabasePostError).message ?? '').toLowerCase();
+}
+
 /** Mensagens orientadas à ação, sem expor o payload bruto do PostgREST. */
 export function getCreatePostErrorMessage(error: unknown): string {
   const code = errorCode(error);
-  const message = error && typeof error === 'object'
-    ? String((error as SupabasePostError).message ?? '').toLowerCase()
-    : '';
+  const message = errorMessage(error);
 
+  if (message.includes('mime type not allowed')) {
+    return 'Este formato de mídia não está liberado para publicação. Escolha outro arquivo ou tente exportar a mídia novamente.';
+  }
+  if (message.includes('file exceeds limit')) {
+    return 'Este arquivo é grande demais para publicar agora. Escolha uma mídia menor e tente novamente.';
+  }
+  if (message.includes('falha ao enviar') || message.includes('upload') || message.includes('r2')) {
+    return 'Não foi possível enviar a mídia. Verifique sua conexão e tente publicar novamente.';
+  }
   if (code === '42501' || message.includes('row-level security')) {
     return 'Sua sessão ou seu perfil não tem permissão para publicar este conteúdo. Entre novamente e tente de novo.';
   }
@@ -64,7 +76,7 @@ async function uploadDraft(
 ): Promise<UploadedMedia> {
   const stamp = `${Date.now()}_${index}`;
   const ext = fileExtension(draft.file) || (draft.kind === 'image' ? 'jpg' : 'mp4');
-  const contentType = draft.file.type || (draft.kind === 'image' ? 'image/jpeg' : 'video/mp4');
+  const contentType = contentTypeForMedia(draft.file, draft.kind);
 
   // A mídia em si é a maior parte do upload; o poster (quando precisa subir)
   // é tratado como um extra fora dessa fração de progresso.
