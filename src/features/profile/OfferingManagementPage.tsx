@@ -50,7 +50,6 @@ function billingLabel(
   billingInterval: OfferingType['billing_interval'],
   t: (key: TranslationKey) => string,
 ): string {
-  if (billingType === 'free') return t('profile.business.offers.billing.free');
   if (billingType === 'recurring') {
     const intervalKey = `profile.business.offers.billing.interval.${billingInterval ?? 'month'}` as TranslationKey;
     return `${t('profile.business.offers.billing.recurring')} · ${t(intervalKey)}`;
@@ -90,8 +89,8 @@ export function OfferingManagementPage() {
     setConfirmArchive(false);
   }
 
-  const isPaidOffering = offering ? offering.billing_type !== 'free' : false;
-  const minimumPrice = type?.minimum_price ?? 0;
+  const isPaidOffering = Boolean(offering);
+  const minimumPrice = type?.minimum_price ?? 1;
 
   function savePrice() {
     if (!offering) return;
