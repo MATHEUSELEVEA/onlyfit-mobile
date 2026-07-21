@@ -94,6 +94,12 @@
      * intercepta a área de duração do vídeo. */
     bottom: calc(var(--feed-inset-b) + 18px);
   }
+
+  /* Overlay de "Publicando…"/erro do post ainda subindo (publishQueue.ts),
+   * ancorado no mesmo topo dos controles do feed. */
+  .feed-publish-status {
+    top: calc(var(--feed-inset-t) + 8px);
+  }
 }
 
 @layer utilities {
