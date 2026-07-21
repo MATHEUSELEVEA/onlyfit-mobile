@@ -11,6 +11,18 @@ export interface HealthDay {
   maxHr?: number;
   hrv?: number;
   sleepMinutes?: number;
+  sleepCoreMinutes?: number;
+  sleepDeepMinutes?: number;
+  sleepRemMinutes?: number;
+  sleepAwakeMinutes?: number;
+  distanceM?: number;
+  exerciseMinutes?: number;
+  standMinutes?: number;
+  flightsClimbed?: number;
+  vo2max?: number;
+  spo2Avg?: number;
+  spo2Min?: number;
+  respiratoryRate?: number;
   /** 0..1 — intensidade do dia para o heatmap (energia ativa + treino). */
   intensity: number;
   hasData: boolean;
@@ -24,8 +36,20 @@ interface DailySummaryLike {
     resting_hr?: number;
     avg_hr?: number;
     max_hr?: number;
-    hrv_rmssd?: number;
+    hrv_sdnn?: number;
     sleep_minutes?: number;
+    sleep_core_minutes?: number;
+    sleep_deep_minutes?: number;
+    sleep_rem_minutes?: number;
+    sleep_awake_minutes?: number;
+    distance_m?: number;
+    exercise_minutes?: number;
+    stand_minutes?: number;
+    flights_climbed?: number;
+    vo2max?: number;
+    spo2_avg?: number;
+    spo2_min?: number;
+    respiratory_rate?: number;
   } | null;
 }
 
@@ -57,8 +81,20 @@ export function buildHealthDays(
     day.restingHr = m.resting_hr;
     day.avgHr = m.avg_hr;
     day.maxHr = m.max_hr;
-    day.hrv = m.hrv_rmssd;
+    day.hrv = m.hrv_sdnn;
     day.sleepMinutes = m.sleep_minutes;
+    day.sleepCoreMinutes = m.sleep_core_minutes;
+    day.sleepDeepMinutes = m.sleep_deep_minutes;
+    day.sleepRemMinutes = m.sleep_rem_minutes;
+    day.sleepAwakeMinutes = m.sleep_awake_minutes;
+    day.distanceM = m.distance_m;
+    day.exerciseMinutes = m.exercise_minutes;
+    day.standMinutes = m.stand_minutes;
+    day.flightsClimbed = m.flights_climbed;
+    day.vo2max = m.vo2max;
+    day.spo2Avg = m.spo2_avg;
+    day.spo2Min = m.spo2_min;
+    day.respiratoryRate = m.respiratory_rate;
     day.hasData = true;
   }
 

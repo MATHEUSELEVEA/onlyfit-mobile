@@ -26,8 +26,20 @@ export interface AppleHealthDailySummaryInput {
   resting_hr?: number;
   avg_hr?: number;
   max_hr?: number;
-  hrv_rmssd?: number;
+  hrv_sdnn?: number;
   sleep_minutes?: number;
+  sleep_core_minutes?: number;
+  sleep_deep_minutes?: number;
+  sleep_rem_minutes?: number;
+  sleep_awake_minutes?: number;
+  distance_m?: number;
+  exercise_minutes?: number;
+  stand_minutes?: number;
+  flights_climbed?: number;
+  vo2max?: number;
+  spo2_avg?: number;
+  spo2_min?: number;
+  respiratory_rate?: number;
   source_payload?: Record<string, unknown>;
 }
 
