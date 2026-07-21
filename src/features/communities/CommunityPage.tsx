@@ -8,7 +8,6 @@ import {
   ListTodo,
   Loader2,
   Lock,
-  LogOut,
   Megaphone,
   MessageSquareText,
   PencilLine,
@@ -98,7 +97,7 @@ export function CommunityPage() {
       <main className="mx-auto w-full max-w-[640px] px-4 pb-8 pt-4">
         <CommunityHeader community={community} />
         <OwnerCard owner={community.owner ?? null} />
-        <CommunityActions community={community} membership={membership} userId={userId} />
+        <CommunityActions community={community} membership={membership} />
 
         {isOwner && (
           <div className="mt-3 flex gap-2">
@@ -152,7 +151,7 @@ export function CommunityPage() {
 
         <section className="mt-4">
           {tab === 'about' ? (
-            <AboutTab community={community} />
+            <AboutTab community={community} userId={userId} isMember={membership === 'member'} />
           ) : tab === 'requests' && isOwner ? (
             <RequestsTab communityId={community.id} />
           ) : !canSeeContent ? (
@@ -206,39 +205,20 @@ function CommunityHeader({ community }: { community: Community }) {
 function CommunityActions({
   community,
   membership,
-  userId,
 }: {
   community: Community;
   membership: MembershipStatus;
-  userId: string | undefined;
 }) {
   const { t } = useTranslation();
   const joinMutation = useJoinCommunity(community.id);
-  const leaveMutation = useLeaveCommunity(community.id, userId);
 
-  if (membership === 'owner') return null;
+  if (membership === 'owner' || membership === 'member') return null;
 
   if (membership === 'banned') {
     return (
       <p role="status" className="mt-3 font-sans text-body-sm text-error">
         {t('communities.bannedNotice')}
       </p>
-    );
-  }
-
-  if (membership === 'member') {
-    return (
-      <button
-        type="button"
-        disabled={leaveMutation.isPending}
-        onClick={() => {
-          if (window.confirm(t('communities.leaveConfirm'))) leaveMutation.mutate();
-        }}
-        className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-surface-container-high font-sans text-label text-on-surface transition-colors hover:bg-surface-container-highest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
-      >
-        {leaveMutation.isPending ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <LogOut size={16} aria-hidden />}
-        {t('communities.leave')}
-      </button>
     );
   }
 
@@ -696,10 +676,26 @@ function RequestsTab({ communityId }: { communityId: string }) {
   );
 }
 
-function AboutTab({ community }: { community: Community }) {
+function AboutTab({
+  community,
+  userId,
+  isMember,
+}: {
+  community: Community;
+  userId: string | undefined;
+  isMember: boolean;
+}) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { labelFor } = useAffinityGroups();
+  const leaveMutation = useLeaveCommunity(community.id, userId);
   const categories = (community.sports ?? []).map(labelFor).join(', ');
+
+  async function handleLeave() {
+    if (!window.confirm(t('communities.leaveConfirm'))) return;
+    await leaveMutation.mutateAsync();
+    navigate('/comunidades', { replace: true });
+  }
 
   return (
     <div className="space-y-4 rounded-2xl bg-surface-container p-4">
@@ -713,6 +709,17 @@ function AboutTab({ community }: { community: Community }) {
       <AboutBlock title={t('communities.about.visibility')}>
         {community.visibility === 'private' ? t('communities.form.privateHint') : t('communities.form.publicHint')}
       </AboutBlock>
+
+      {isMember && (
+        <button
+          type="button"
+          disabled={leaveMutation.isPending}
+          onClick={() => void handleLeave()}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-outline-variant/50 font-sans text-label text-error transition-colors hover:bg-error-container/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+        >
+          {t('communities.leave')}
+        </button>
+      )}
     </div>
   );
 }
