@@ -80,7 +80,6 @@ export interface SportMetricSet {
 export function activityMetrics(activity: SportActivityLike): SportMetricSet {
   const minutes = activity.movingTimeMin ?? activity.durationMin;
   const sp = activity.sourcePayload ?? {};
-  const cadenceSpm = num(sp.cadence_spm);
   const strokes = num(sp.swim_stroke_count);
   const poolLengthM = num(sp.pool_length_m) ?? 25;
 
@@ -94,7 +93,6 @@ export function activityMetrics(activity: SportActivityLike): SportMetricSet {
   const pace100 = m('meufit.training.metric.pace100', (() => { const p = pacePer100m(activity.distanceKm, minutes); return p ? `${p} /100m` : null; })());
   const speed = m('meufit.training.metric.speed', activity.averageSpeedKmh ? `${activity.averageSpeedKmh.toLocaleString('pt-BR')} km/h` : null);
   const power = m('meufit.training.metric.power', activity.averagePowerW ? `${activity.averagePowerW} W` : null);
-  const cadence = m('meufit.training.metric.cadence', cadenceSpm ? `${cadenceSpm} spm` : null);
   const strokeCount = m('meufit.training.metric.strokes', strokes ? `${strokes}` : null);
   const swolfValue = m('meufit.training.metric.swolf', (() => { const s = swolf(activity.distanceKm, minutes, strokes, poolLengthM); return s ? `${s}` : null; })());
 
@@ -106,7 +104,9 @@ export function activityMetrics(activity: SportActivityLike): SportMetricSet {
   switch (activity.surface) {
     case 'running':
     case 'walking':
-      return compact([pace, distance, duration], [avgHr, cadence, elevation, kcal, maxHr]);
+      // Principais: pace + distância (+ duração). Cadência NÃO é destaque —
+      // fica só no detalhe bruto (activitySportDetails), quando houver.
+      return compact([pace, distance, duration], [avgHr, elevation, kcal, maxHr]);
     case 'cycling':
       // Potência é a métrica-mãe quando há sensor; senão a velocidade assume o
       // destaque (e não se repete nas complementares).
