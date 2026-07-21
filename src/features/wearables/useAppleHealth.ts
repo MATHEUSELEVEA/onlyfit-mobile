@@ -50,8 +50,20 @@ type DailySummaryRow = {
     resting_hr?: number;
     avg_hr?: number;
     max_hr?: number;
-    hrv_rmssd?: number;
+    hrv_sdnn?: number;
     sleep_minutes?: number;
+    sleep_core_minutes?: number;
+    sleep_deep_minutes?: number;
+    sleep_rem_minutes?: number;
+    sleep_awake_minutes?: number;
+    distance_m?: number;
+    exercise_minutes?: number;
+    stand_minutes?: number;
+    flights_climbed?: number;
+    vo2max?: number;
+    spo2_avg?: number;
+    spo2_min?: number;
+    respiratory_rate?: number;
   } | null;
 };
 
@@ -411,13 +423,31 @@ export function useAppleHealth() {
 
   const progress = useMemo(() => {
     const rows = dailySummaries.data ?? [];
-    const steps = rows.reduce((sum, row) => sum + (row.metrics?.steps ?? 0), 0);
-    const activeKcal = rows.reduce((sum, row) => sum + (row.metrics?.active_kcal ?? 0), 0);
-    const sleepRows = rows.filter((row) => row.metrics?.sleep_minutes);
-    const avgSleepMinutes = sleepRows.length
-      ? Math.round(sleepRows.reduce((sum, row) => sum + (row.metrics?.sleep_minutes ?? 0), 0) / sleepRows.length)
-      : null;
-    return { steps, activeKcal, avgSleepMinutes };
+    const sum = (pick: (m: NonNullable<DailySummaryRow['metrics']>) => number | undefined) =>
+      rows.reduce((total, row) => total + (row.metrics ? pick(row.metrics) ?? 0 : 0), 0);
+    const avg = (pick: (m: NonNullable<DailySummaryRow['metrics']>) => number | undefined) => {
+      const values = rows.map((row) => (row.metrics ? pick(row.metrics) : undefined)).filter((value): value is number => typeof value === 'number' && value > 0);
+      return values.length ? Math.round(values.reduce((total, value) => total + value, 0) / values.length) : null;
+    };
+    const latest = (pick: (m: NonNullable<DailySummaryRow['metrics']>) => number | undefined) => {
+      // rows já vêm ordenadas por data desc; primeiro com valor é o mais recente.
+      for (const row of rows) {
+        const value = row.metrics ? pick(row.metrics) : undefined;
+        if (typeof value === 'number' && value > 0) return value;
+      }
+      return null;
+    };
+    return {
+      steps: sum((m) => m.steps),
+      activeKcal: sum((m) => m.active_kcal),
+      exerciseMinutes: sum((m) => m.exercise_minutes),
+      distanceKm: Math.round((sum((m) => m.distance_m) / 1000) * 10) / 10,
+      avgSleepMinutes: avg((m) => m.sleep_minutes),
+      avgRestingHr: avg((m) => m.resting_hr),
+      avgHrv: avg((m) => m.hrv_sdnn),
+      avgSpo2: avg((m) => m.spo2_avg),
+      latestVo2max: latest((m) => m.vo2max),
+    };
   }, [dailySummaries.data]);
 
   const refetch = useCallback(async () => {

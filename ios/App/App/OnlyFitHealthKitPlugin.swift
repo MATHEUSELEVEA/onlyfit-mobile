@@ -134,7 +134,13 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
             ("heart_rate", HKQuantityTypeIdentifier.heartRate),
             ("resting_heart_rate", HKQuantityTypeIdentifier.restingHeartRate),
             ("hrv", HKQuantityTypeIdentifier.heartRateVariabilitySDNN),
-            ("steps", HKQuantityTypeIdentifier.stepCount)
+            ("steps", HKQuantityTypeIdentifier.stepCount),
+            ("exercise_time", HKQuantityTypeIdentifier.appleExerciseTime),
+            ("stand_time", HKQuantityTypeIdentifier.appleStandTime),
+            ("flights_climbed", HKQuantityTypeIdentifier.flightsClimbed),
+            ("vo2max", HKQuantityTypeIdentifier.vo2Max),
+            ("spo2", HKQuantityTypeIdentifier.oxygenSaturation),
+            ("respiratory_rate", HKQuantityTypeIdentifier.respiratoryRate)
         ].compactMap { pair -> (key: String, type: HKSampleType)? in
             guard let type = HKObjectType.quantityType(forIdentifier: pair.1) else { return nil }
             return (pair.0, type)
@@ -363,8 +369,15 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
             if summary["active_kcal"] != nil { received.insert("active_energy") }
             if summary["avg_hr"] != nil || summary["max_hr"] != nil { received.insert("heart_rate") }
             if summary["resting_hr"] != nil { received.insert("resting_heart_rate") }
-            if summary["hrv_rmssd"] != nil { received.insert("hrv") }
+            if summary["hrv_sdnn"] != nil { received.insert("hrv") }
             if summary["sleep_minutes"] != nil { received.insert("sleep") }
+            if summary["distance_m"] != nil { received.insert("distance_walking_running") }
+            if summary["exercise_minutes"] != nil { received.insert("exercise_time") }
+            if summary["stand_minutes"] != nil { received.insert("stand_time") }
+            if summary["flights_climbed"] != nil { received.insert("flights_climbed") }
+            if summary["vo2max"] != nil { received.insert("vo2max") }
+            if summary["spo2_avg"] != nil || summary["spo2_min"] != nil { received.insert("spo2") }
+            if summary["respiratory_rate"] != nil { received.insert("respiratory_rate") }
         }
         return received
     }
@@ -413,6 +426,9 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
             if workout.duration > 0 {
                 row["avg_speed_mps"] = distance / workout.duration
             }
+        }
+        if let elevation = (workout.metadata?[HKMetadataKeyElevationAscended] as? HKQuantity)?.doubleValue(for: .meter()) {
+            row["elevation_gain_m"] = elevation
         }
         if let avg = heartRate.avg {
             row["avg_hr"] = Int(avg.rounded())
@@ -509,13 +525,61 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
 
         group.enter()
         fetchDiscrete(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), startDate: dayStart, endDate: dayEnd, options: .discreteAverage) { avg, _ in
-            if let avg = avg { metrics["hrv_rmssd"] = Int(avg.rounded()) }
+            if let avg = avg { metrics["hrv_sdnn"] = Int(avg.rounded()) }
             group.leave()
         }
 
         group.enter()
-        fetchSleepMinutes(startDate: dayStart, endDate: dayEnd) { minutes in
-            if let minutes = minutes { metrics["sleep_minutes"] = Int(minutes.rounded()) }
+        fetchCumulative(.distanceWalkingRunning, unit: .meter(), startDate: dayStart, endDate: dayEnd) { value in
+            if let value = value { metrics["distance_m"] = Int(value.rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchCumulative(.appleExerciseTime, unit: .minute(), startDate: dayStart, endDate: dayEnd) { value in
+            if let value = value { metrics["exercise_minutes"] = Int(value.rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchCumulative(.appleStandTime, unit: .minute(), startDate: dayStart, endDate: dayEnd) { value in
+            if let value = value { metrics["stand_minutes"] = Int(value.rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchCumulative(.flightsClimbed, unit: .count(), startDate: dayStart, endDate: dayEnd) { value in
+            if let value = value { metrics["flights_climbed"] = Int(value.rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchStat(.vo2Max, unit: HKUnit(from: "ml/kg*min"), startDate: dayStart, endDate: dayEnd, option: .discreteAverage, pick: { $0?.averageQuantity() }) { value in
+            if let value = value { metrics["vo2max"] = Int(value.rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchStat(.oxygenSaturation, unit: .percent(), startDate: dayStart, endDate: dayEnd, option: .discreteAverage, pick: { $0?.averageQuantity() }) { value in
+            if let value = value { metrics["spo2_avg"] = Int((value * 100).rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchStat(.oxygenSaturation, unit: .percent(), startDate: dayStart, endDate: dayEnd, option: .discreteMin, pick: { $0?.minimumQuantity() }) { value in
+            if let value = value { metrics["spo2_min"] = Int((value * 100).rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchStat(.respiratoryRate, unit: HKUnit.count().unitDivided(by: .minute()), startDate: dayStart, endDate: dayEnd, option: .discreteAverage, pick: { $0?.averageQuantity() }) { value in
+            if let value = value { metrics["respiratory_rate"] = Int(value.rounded()) }
+            group.leave()
+        }
+
+        group.enter()
+        fetchSleepStages(startDate: dayStart, endDate: dayEnd) { stages in
+            if let stages = stages { for (key, value) in stages { metrics[key] = value } }
             group.leave()
         }
 
@@ -551,7 +615,33 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
         healthStore.execute(query)
     }
 
-    private func fetchSleepMinutes(startDate: Date, endDate: Date, completion: @escaping (Double?) -> Void) {
+    // Estatística discreta de um único agregado (média OU mínimo, conforme a
+    // opção), escolhendo a quantidade certa via closure. Usado por métricas que
+    // não precisam do par (média,máx) do fetchDiscrete: VO2max, SpO2, respiração.
+    private func fetchStat(
+        _ identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        startDate: Date,
+        endDate: Date,
+        option: HKStatisticsOptions,
+        pick: @escaping (HKStatistics?) -> HKQuantity?,
+        completion: @escaping (Double?) -> Void
+    ) {
+        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else {
+            completion(nil)
+            return
+        }
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: [.strictStartDate])
+        let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: option) { _, stats, _ in
+            completion(pick(stats)?.doubleValue(for: unit))
+        }
+        healthStore.execute(query)
+    }
+
+    // Sono por fase. Valores brutos do HKCategoryValueSleepAnalysis (raw Int para
+    // não exigir símbolos iOS 16): 1 = dormindo (não especificado), 2 = acordado,
+    // 3 = núcleo, 4 = profundo, 5 = REM. `sleep_minutes` é o total dormido.
+    private func fetchSleepStages(startDate: Date, endDate: Date, completion: @escaping ([String: Int]?) -> Void) {
         guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
             completion(nil)
             return
@@ -559,16 +649,29 @@ public class OnlyFitHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
         let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: [.strictStartDate])
         let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
             let sleepSamples = (samples as? [HKCategorySample]) ?? []
-            let asleepValues: Set<Int> = [
-                HKCategoryValueSleepAnalysis.asleep.rawValue,
-                3, // asleepCore
-                4, // asleepDeep
-                5  // asleepREM
-            ]
-            let totalSeconds = sleepSamples
-                .filter { asleepValues.contains($0.value) }
-                .reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
-            completion(totalSeconds > 0 ? totalSeconds / 60 : nil)
+            var seconds: [String: Double] = ["core": 0, "deep": 0, "rem": 0, "awake": 0, "unspecified": 0]
+            for sample in sleepSamples {
+                let duration = sample.endDate.timeIntervalSince(sample.startDate)
+                switch sample.value {
+                case 3: seconds["core", default: 0] += duration
+                case 4: seconds["deep", default: 0] += duration
+                case 5: seconds["rem", default: 0] += duration
+                case 2: seconds["awake", default: 0] += duration
+                case 1: seconds["unspecified", default: 0] += duration
+                default: break
+                }
+            }
+            let asleep = (seconds["core"] ?? 0) + (seconds["deep"] ?? 0) + (seconds["rem"] ?? 0) + (seconds["unspecified"] ?? 0)
+            if asleep <= 0 && (seconds["awake"] ?? 0) <= 0 {
+                completion(nil)
+                return
+            }
+            var out: [String: Int] = ["sleep_minutes": Int((asleep / 60).rounded())]
+            if let core = seconds["core"], core > 0 { out["sleep_core_minutes"] = Int((core / 60).rounded()) }
+            if let deep = seconds["deep"], deep > 0 { out["sleep_deep_minutes"] = Int((deep / 60).rounded()) }
+            if let rem = seconds["rem"], rem > 0 { out["sleep_rem_minutes"] = Int((rem / 60).rounded()) }
+            if let awake = seconds["awake"], awake > 0 { out["sleep_awake_minutes"] = Int((awake / 60).rounded()) }
+            completion(out)
         }
         healthStore.execute(query)
     }
