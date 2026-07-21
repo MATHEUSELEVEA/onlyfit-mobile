@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Loader2, Plus } from 'lucide-react';
+import { ChevronRight, Loader2, Plus, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@/i18n/I18nProvider';
 import type { TranslationKey } from '@/i18n/translations';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -14,6 +14,7 @@ import {
   type OfferingType,
   type OfferingStatus,
 } from '../useBusinessOfferings';
+import { useOfferingCheckout } from '@/features/payments/useOfferingCheckout';
 
 function mapOfferingError(error: unknown, t: (key: TranslationKey) => string): string {
   const message = error instanceof Error ? error.message : '';
@@ -29,7 +30,6 @@ function billingLabel(
   billingInterval: OfferingType['billing_interval'],
   t: (key: TranslationKey) => string,
 ): string {
-  if (billingType === 'free') return t('profile.business.offers.billing.free');
   if (billingType === 'recurring') {
     const intervalKey = `profile.business.offers.billing.interval.${billingInterval ?? 'month'}` as TranslationKey;
     return `${t('profile.business.offers.billing.recurring')} · ${t(intervalKey)}`;
@@ -48,6 +48,7 @@ export function BusinessOfferingsSection({
   const navigate = useNavigate();
   const { data: types = [] } = useOfferingTypes();
   const { data: offerings = [], isLoading, isError } = useBusinessOfferings(businessId);
+  const checkout = useOfferingCheckout();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<OfferingType | null>(null);
@@ -118,6 +119,17 @@ export function BusinessOfferingsSection({
                   className="flex w-full items-center gap-3 border-b border-outline-variant/15 px-4 py-3.5 last:border-b-0"
                 >
                   {row}
+                  {offering.status === 'active' && offering.price != null && (
+                    <button
+                      type="button"
+                      className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full bg-primary px-3 font-sans text-counter text-on-primary disabled:opacity-60"
+                      disabled={checkout.isPending}
+                      onClick={() => checkout.mutate({ offeringId: offering.id, billingType: offering.billing_type })}
+                    >
+                      <ShoppingCart size={14} aria-hidden />
+                      {t('profile.business.offers.buy')}
+                    </button>
+                  )}
                 </div>
               );
             })}

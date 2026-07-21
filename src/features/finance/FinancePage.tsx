@@ -1,13 +1,24 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Clock, Wallet, ArrowDownToLine } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Clock, Wallet, ArrowDownToLine, Loader2 } from 'lucide-react';
 import { useTranslation } from '@/i18n/I18nProvider';
+import { useProfessionalWallet } from './useProfessionalWallet';
 
-// Shell do Financeiro do profissional. A UX (saldo a liquidar / disponível /
-// extrato) vale para as duas opções de custódia em estudo — a fonte real do
-// saldo entra depois da decisão do modelo de pagamento (ver ESPECIFICACAO-
-// PAGAMENTOS §2/§11). Por ora, saldos zerados e extrato vazio.
 export function FinancePage() {
   const { t } = useTranslation();
+  const { summary, ledger, payout } = useProfessionalWallet();
+  const [error, setError] = useState<string | null>(null);
+  const balance = summary.data;
+  const formatMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  function requestPayout() {
+    const raw = window.prompt(t('finance.payoutPrompt'));
+    if (raw === null) return;
+    const amount = Number(raw.replace(/\./g, '').replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0) { setError(t('finance.payoutInvalid')); return; }
+    setError(null);
+    payout.mutate(Math.round(amount * 100) / 100, { onError: () => setError(t('finance.payoutError')) });
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-background pb-10">
@@ -33,20 +44,21 @@ export function FinancePage() {
             <BalanceCard
               icon={Clock}
               label={t('finance.pendingBalance')}
-              value="R$ 0,00"
+              value={formatMoney(Number(balance?.pending_balance ?? 0))}
               hint={t('finance.pendingHint')}
             />
             <BalanceCard
               icon={Wallet}
               label={t('finance.availableBalance')}
-              value="R$ 0,00"
+              value={formatMoney(Number(balance?.available_balance ?? 0))}
               hint={t('finance.availableHint')}
             />
           </div>
 
           <button
             type="button"
-            disabled
+            disabled={payout.isPending || Number(balance?.available_balance ?? 0) <= 0}
+            onClick={requestPayout}
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-surface-container px-5 font-sans text-label text-on-surface-variant opacity-70"
           >
             <ArrowDownToLine size={18} aria-hidden />
@@ -55,7 +67,7 @@ export function FinancePage() {
 
           <section className="space-y-3">
             <h2 className="px-1 font-sans text-label text-on-surface">{t('finance.statementTitle')}</h2>
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-outline-variant/50 bg-surface-container/40 px-6 py-10 text-center">
+            {ledger.isLoading ? <div className="flex min-h-24 items-center justify-center"><Loader2 size={24} className="animate-spin text-primary" /></div> : ledger.data?.length ? <div className="space-y-2">{ledger.data.map((entry) => <div key={entry.id} className="flex items-center justify-between rounded-xl bg-surface-container px-4 py-3"><span className="font-sans text-body-sm text-on-surface-variant">{entry.entry_type}</span><span className={`font-sans text-body-sm font-semibold ${entry.amount >= 0 ? 'text-primary' : 'text-error'}`}>{entry.amount >= 0 ? '+' : ''}{formatMoney(Number(entry.amount))}</span></div>)}</div> : <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-outline-variant/50 bg-surface-container/40 px-6 py-10 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <Wallet size={22} aria-hidden />
               </span>
@@ -63,7 +75,8 @@ export function FinancePage() {
                 <p className="font-sans text-body font-medium text-on-surface">{t('finance.emptyTitle')}</p>
                 <p className="mt-1 font-sans text-body-sm text-on-surface-variant">{t('finance.emptyDescription')}</p>
               </div>
-            </div>
+            </div>}
+            {error && <p role="alert" className="font-sans text-body-sm text-error">{error}</p>}
           </section>
         </main>
       </div>

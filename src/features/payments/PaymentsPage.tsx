@@ -10,6 +10,7 @@ import {
   useSetDefaultCard,
   type PaymentCard,
 } from './usePaymentCards';
+import { usePaymentTransactions, type PaymentTransaction } from './usePaymentTransactions';
 
 type PaymentsTab = 'cartoes' | 'pagamentos';
 
@@ -201,12 +202,42 @@ function CardRow({ card }: { card: PaymentCard }) {
 
 function HistoryTab() {
   const { t } = useTranslation();
+  const { data: transactions = [], isLoading, isError } = usePaymentTransactions();
+  if (isLoading) return <div className="flex min-h-40 items-center justify-center"><Loader2 size={26} className="animate-spin text-primary" /></div>;
+  if (isError) return <p role="alert" className="rounded-2xl bg-error-container p-4 font-sans text-body-sm text-on-error-container">{t('payments.history.loadError')}</p>;
+  if (!transactions.length) return <EmptyState icon={ReceiptText} title={t('payments.history.emptyTitle')} description={t('payments.history.emptyDescription')} />;
   return (
-    <EmptyState
-      icon={ReceiptText}
-      title={t('payments.history.emptyTitle')}
-      description={t('payments.history.emptyDescription')}
-    />
+    <section className="space-y-3">
+      {transactions.map((transaction) => <PaymentRow key={transaction.id} transaction={transaction} />)}
+    </section>
+  );
+}
+
+function PaymentRow({ transaction }: { transaction: PaymentTransaction }) {
+  const { t } = useTranslation();
+  const statusKey = transaction.settlement_status || transaction.status;
+  const labels: Record<string, string> = {
+    pending: t('payments.history.status.pending'),
+    confirmed: t('payments.history.status.confirmed'),
+    settled: t('payments.history.status.settled'),
+    refunded: t('payments.history.status.refunded'),
+    chargeback: t('payments.history.status.chargeback'),
+    failed: t('payments.history.status.failed'),
+  };
+  return (
+    <article className="rounded-2xl border border-outline-variant/40 bg-surface p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><ReceiptText size={18} aria-hidden /></span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-sans text-body font-medium text-on-surface">{transaction.billing_type === 'recurring' ? t('payments.history.subscription') : t('payments.history.oneTime')}</p>
+          <p className="mt-0.5 font-sans text-body-sm text-on-surface-variant">{new Date(transaction.created_at).toLocaleDateString()}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-sans text-body font-semibold text-on-surface">{Number(transaction.gross_value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          <span className="font-sans text-counter text-on-surface-variant">{labels[statusKey] ?? statusKey}</span>
+        </div>
+      </div>
+    </article>
   );
 }
 

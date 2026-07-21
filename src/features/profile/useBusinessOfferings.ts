@@ -8,7 +8,7 @@ export interface OfferingType {
   name: string;
   description: string | null;
   icon: string | null;
-  billing_type: 'one_time' | 'recurring' | 'free';
+  billing_type: 'one_time' | 'recurring';
   billing_interval: 'month' | '2month' | 'quarter' | 'semester' | 'year' | null;
   minimum_price: number;
   max_per_business: number | null;
@@ -27,7 +27,7 @@ export interface BusinessOffering {
   name: string;
   description: string | null;
   status: OfferingStatus;
-  billing_type: 'one_time' | 'recurring' | 'free';
+  billing_type: 'one_time' | 'recurring';
   billing_interval: 'month' | '2month' | 'quarter' | 'semester' | 'year' | null;
   price: number | null;
   currency: string;
