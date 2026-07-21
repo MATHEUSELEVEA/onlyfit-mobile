@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { updatePostCaches } from '@/features/feed/useFeed';
+import { cloudflareAnimatedThumb } from '@/lib/cloudflareStream';
 
 // O flag de comentários mora em posts.metadata (jsonb) — sem coluna nova, o
 // desktop e o v1 continuam lendo a tabela sem mudança de schema.
@@ -9,6 +10,8 @@ export interface MyPost {
   id: string;
   caption: string;
   thumbnailUrl: string | null;
+  /** Prévia animada (GIF do Cloudflare Stream) para vídeo já normalizado. */
+  animatedThumbUrl: string | null;
   isVideo: boolean;
   isPremium: boolean;
   likes: number;
@@ -25,6 +28,8 @@ interface MyPostRow {
   is_premium: boolean | null;
   thumbnail_url: string | null;
   video_url: string | null;
+  stream_status: string | null;
+  stream_playback_url: string | null;
   likes: number | null;
   comments: number | null;
   published_at: string;
@@ -55,7 +60,7 @@ export function useMyPosts() {
       const { data, error } = await supabase
         .from('posts')
         .select(
-          'id, title, description, is_premium, thumbnail_url, video_url, likes, comments, published_at, metadata',
+          'id, title, description, is_premium, thumbnail_url, video_url, stream_status, stream_playback_url, likes, comments, published_at, metadata',
         )
         .eq('creator_id', userId!)
         .order('published_at', { ascending: false });
@@ -66,6 +71,7 @@ export function useMyPosts() {
         caption: row.description ?? row.title ?? '',
         // Capa espelhada em thumbnail_url para vídeo, imagem e carrossel (padrão v1).
         thumbnailUrl: row.thumbnail_url,
+        animatedThumbUrl: cloudflareAnimatedThumb(row.stream_status === 'ready' ? row.stream_playback_url : null),
         isVideo: Boolean(row.video_url),
         isPremium: Boolean(row.is_premium),
         likes: row.likes ?? 0,

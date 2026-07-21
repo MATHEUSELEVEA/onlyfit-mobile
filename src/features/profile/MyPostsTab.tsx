@@ -187,8 +187,8 @@ export function MyPostsTab({ username }: { username: string | null }) {
               }}
               className="block h-full w-full"
             >
-              {post.thumbnailUrl ? (
-                <img src={post.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+              {post.animatedThumbUrl || post.thumbnailUrl ? (
+                <img src={post.animatedThumbUrl ?? post.thumbnailUrl ?? undefined} alt="" loading="lazy" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-container-high to-surface-container text-on-surface-variant">
                   <Play size={30} aria-hidden />
