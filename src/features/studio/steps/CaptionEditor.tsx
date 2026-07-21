@@ -1,6 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Loader2, Wand2, X } from 'lucide-react';
 import { clsx } from 'clsx';
+import { supabase } from '@/lib/supabase';
+import { uploadAsset } from '../upload';
+import { fileExtension } from '../media';
 import { CaptionOverlay } from '@/features/feed/CaptionOverlay';
 import {
   CAPTION_COLORS,
@@ -41,9 +44,53 @@ export function CaptionEditor({ media, value, onSave, onClose }: { media: DraftM
   const [style, setStyle] = useState<CaptionStyle>(value?.style ?? DEFAULT_CAPTION_STYLE);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  // Cues com tempo real vindos da auto-transcrição (preservam o timing exato
+  // enquanto o nº de linhas bater; ao mudar o nº de linhas, cai na distribuição
+  // uniforme). Slice 2.
+  const [autoCues, setAutoCues] = useState<CaptionCue[] | null>(value?.cues ?? null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcribeMsg, setTranscribeMsg] = useState<string | null>(null);
 
-  const cues = useMemo(() => linesToCues(text, duration || 1), [text, duration]);
+  const cues = useMemo(() => {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (autoCues && autoCues.length === lines.length) return autoCues.map((c, i) => ({ ...c, text: lines[i] }));
+    return linesToCues(text, duration || 1);
+  }, [text, duration, autoCues]);
   const previewTrack: CaptionTrack = { cues, style };
+
+  // Auto-transcrição sob demanda (espera condicional): só roda se o criador
+  // pedir. Sobe o clipe pro R2, dispara a transcrição no Cloudflare e faz poll.
+  const autoTranscribe = async () => {
+    if (transcribing) return;
+    setTranscribing(true);
+    setTranscribeMsg(null);
+    try {
+      const ext = fileExtension(media.file) || 'mp4';
+      const url = await uploadAsset(media.file, `caption_src_${Date.now()}.${ext}`, media.file.type || 'video/mp4', 'onlyfit-media');
+      const { data: started } = await supabase.functions.invoke<{ uid?: string }>('transcribe-clip', { body: { source_url: url } });
+      const uid = started?.uid;
+      if (!uid) throw new Error('start failed');
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+        const { data } = await supabase.functions.invoke<{ status?: string; cues?: CaptionCue[] }>('transcribe-clip', { body: { uid, action: 'captions' } });
+        if (data?.status === 'ready') {
+          const result = data.cues ?? [];
+          if (result.length > 0) {
+            setAutoCues(result);
+            setText(result.map((c) => c.text).join('\n'));
+          } else {
+            setTranscribeMsg('Não identifiquei fala no vídeo — escreva manualmente.');
+          }
+          return;
+        }
+      }
+      setTranscribeMsg('A transcrição demorou. Tente de novo ou escreva manualmente.');
+    } catch {
+      setTranscribeMsg('Não consegui transcrever agora — escreva manualmente.');
+    } finally {
+      setTranscribing(false);
+    }
+  };
 
   const save = () => onSave(cues.length > 0 ? { cues, style } : null);
 
@@ -72,6 +119,16 @@ export function CaptionEditor({ media, value, onSave, onClose }: { media: DraftM
       </div>
 
       <div className="space-y-4 border-t border-white/10 bg-black px-4 pb-safe-bottom pt-4">
+        <button
+          type="button"
+          onClick={autoTranscribe}
+          disabled={transcribing}
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/25 bg-white/10 font-sans text-label text-white transition-opacity disabled:opacity-60"
+        >
+          {transcribing ? <Loader2 size={18} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Wand2 size={18} aria-hidden />}
+          {transcribing ? 'Transcrevendo…' : 'Transcrever automaticamente'}
+        </button>
+        {transcribeMsg && <p className="font-sans text-body-sm text-white/70">{transcribeMsg}</p>}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
