@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Activity, Bike, CalendarX2, ChevronLeft, ChevronRight, Droplet, Dumbbell, Flame, Footprints, Gauge, HeartPulse, Info, Leaf, MapPin, Moon, Play, Plus, RotateCcw, Sparkles, Timer, Waves, Watch, X } from 'lucide-react';
+import { Activity, Bike, CalendarX2, ChevronLeft, ChevronRight, Droplet, Dumbbell, Flame, Footprints, Gauge, HeartPulse, Info, Leaf, ListChecks, MapPin, Moon, Play, Plus, RotateCcw, Sparkles, Timer, Waves, Watch, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -169,54 +169,69 @@ function Today({ items, active }: { items: ScheduledWorkout[]; active: Scheduled
   );
 }
 
-/** Card de um treino do dia, já acionável direto (sem passo de escolher categoria). */
+/**
+ * Card de treino do dia — acionável direto, acabamento premium por contenção:
+ * título forte, chips de métrica com números tabulares, lista de exercícios numa
+ * banda tonal recuada e CTA em pílula lime (a única voz de cor). Sem sombra, sem
+ * neon: profundidade é tonal (ramp de surface-containers).
+ */
 function TodayWorkoutCard({ item }: { item: ScheduledWorkout }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { templates, startSession, activeSession, skipToday } = useTraining();
   const template = templates.find((entry) => entry.id === item.templateId);
+  const exerciseCount = template?.exercises.length ?? 0;
   const isActive = activeSession?.scheduledId === item.id;
   const canStart = item.canStart !== false && (item.status === 'planned' || item.status === 'active' || item.status === 'partial');
   const anotherWorkoutIsActive = Boolean(activeSession && !isActive);
+  const highlighted = isActive || item.status === 'active';
+
   return (
-    <article className="rounded-2xl border border-outline-variant/40 bg-surface-container p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-sans text-title text-on-surface">{item.title}</h3>
-          <p className="mt-1 font-sans text-body-sm text-on-surface-variant">{item.focus} · {t('meufit.training.today.minutes', { minutes: item.durationMin })}</p>
+    <article className={clsx('overflow-hidden rounded-3xl border bg-surface-container transition-colors', highlighted ? 'border-primary/40 bg-primary/[0.05]' : 'border-outline-variant/40')}>
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="min-w-0 font-sans text-title leading-tight text-on-surface">{item.title}</h3>
+          {item.status !== 'planned' ? (
+            <span className={clsx('shrink-0 rounded-full px-2.5 py-1 font-sans text-counter', highlighted ? 'bg-primary/15 text-primary' : 'bg-surface-container-high text-on-surface-variant')}>{statusLabel[item.status]}</span>
+          ) : null}
         </div>
-        <span className="shrink-0 rounded-full bg-surface-container-high px-2.5 py-1 font-sans text-counter text-on-surface-variant">{statusLabel[item.status]}</span>
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1 font-sans text-counter tabular-nums text-on-surface-variant"><Timer size={13} aria-hidden />{t('meufit.training.today.minutes', { minutes: item.durationMin })}</span>
+          {exerciseCount ? <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1 font-sans text-counter tabular-nums text-on-surface-variant"><ListChecks size={13} aria-hidden />{t(exerciseCount === 1 ? 'meufit.training.library.exerciseCount' : 'meufit.training.library.exerciseCountPlural', { count: exerciseCount })}</span> : null}
+          {item.focus ? <span className="inline-flex items-center rounded-full bg-surface-container-high px-3 py-1 font-sans text-counter text-on-surface-variant">{item.focus}</span> : null}
+        </div>
       </div>
-      <div className="mt-5 border-t border-outline-variant/40 pt-4">
-        <h4 className="font-sans text-label text-on-surface">{t('meufit.training.today.exercises')}</h4>
-        {template?.exercises.length ? (
-          <ol className="mt-3 space-y-3">
-            {template.exercises.map((exercise, index) => (
-              <li key={exercise.id} className="flex items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-container-high font-sans text-counter text-primary">{index + 1}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-sans text-label text-on-surface">{exercise.name}</span>
-                  <span className="mt-0.5 block font-sans text-body-sm text-on-surface-variant">{exercise.muscle} · {exercise.sets} × {exercise.targetReps}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="mt-2 font-sans text-body-sm text-on-surface-variant">{t('meufit.training.today.noExercises')}</p>
-        )}
+
+      {template?.exercises.length ? (
+        <ol className="divide-y divide-outline-variant/15 border-y border-outline-variant/20 bg-surface-container-lowest">
+          {template.exercises.map((exercise, index) => (
+            <li key={exercise.id} className="flex items-center gap-3.5 px-5 py-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-surface-container-high font-sans text-counter tabular-nums text-on-surface">{String(index + 1).padStart(2, '0')}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-sans text-label text-on-surface">{exercise.name}</span>
+                <span className="mt-0.5 block font-sans text-body-sm tabular-nums text-on-surface-variant">{exercise.muscle} · {exercise.sets} × {exercise.targetReps}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="border-y border-outline-variant/20 bg-surface-container-lowest px-5 py-4 font-sans text-body-sm text-on-surface-variant">{t('meufit.training.today.noExercises')}</p>
+      )}
+
+      <div className="p-4">
+        {canStart ? (
+          <button type="button" disabled={anotherWorkoutIsActive} onClick={() => { startSession(item.id); navigate('/meu-fit/treino/player'); }} className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-primary font-sans text-label text-on-primary transition-opacity duration-150 enabled:hover:opacity-90 enabled:active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-on-surface-variant">
+            <Play size={18} fill="currentColor" aria-hidden />
+            {t(anotherWorkoutIsActive ? 'meufit.training.today.finishCurrent' : isActive ? 'meufit.training.today.continue' : 'meufit.training.today.start')}
+          </button>
+        ) : null}
+        {item.status === 'planned' ? (
+          <button type="button" onClick={() => skipToday(item.id)} className="mt-1.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-full font-sans text-counter text-on-surface-variant transition-colors duration-150 hover:bg-surface-container-high active:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <CalendarX2 size={16} aria-hidden />
+            {t('meufit.training.today.skip')}
+          </button>
+        ) : null}
       </div>
-      {canStart ? (
-        <button type="button" disabled={anotherWorkoutIsActive} onClick={() => { startSession(item.id); navigate('/meu-fit/treino/player'); }} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-sans text-label text-on-primary transition-opacity duration-150 enabled:hover:opacity-90 enabled:active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-on-surface-variant">
-          <Play size={18} fill="currentColor" aria-hidden />
-          {t(anotherWorkoutIsActive ? 'meufit.training.today.finishCurrent' : isActive ? 'meufit.training.today.continue' : 'meufit.training.today.start')}
-        </button>
-      ) : null}
-      {item.status === 'planned' ? (
-        <button type="button" onClick={() => skipToday(item.id)} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl font-sans text-label text-on-surface-variant transition-colors duration-150 hover:bg-surface-container-high active:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          <CalendarX2 size={18} aria-hidden />
-          {t('meufit.training.today.skip')}
-        </button>
-      ) : null}
     </article>
   );
 }
