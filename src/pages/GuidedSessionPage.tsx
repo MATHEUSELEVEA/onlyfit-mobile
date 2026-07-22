@@ -373,6 +373,10 @@ export function GuidedSessionPage() {
         ) : (
           <>
             <p className="mt-5 font-sans tabular-nums text-on-surface" style={{ fontSize: 'clamp(3.25rem, 20vw, 5.5rem)', lineHeight: 1 }}>{phase.bound.by === 'distance' ? formatDistance(phase.bound.meters) : isTimed ? formatClock(remaining) : t('meufit.training.guided.byOpen')}</p>
+            {/* Distância → voltas na piscina do treino (padrão MySwimPro). */}
+            {phase.bound.by === 'distance' && guided.plan.poolLengthMeters ? (
+              <p className="mt-1 font-sans text-body-sm tabular-nums text-on-surface-variant">{t('meufit.training.guided.laps', { n: Math.max(1, Math.ceil(phase.bound.meters / guided.plan.poolLengthMeters)), len: formatDistance(guided.plan.poolLengthMeters) })}</p>
+            ) : null}
             <p className="mt-5 font-sans text-label">
               {phase.step.sport?.stroke ? (
                 <>
@@ -416,6 +420,25 @@ export function GuidedSessionPage() {
         ) : (
           <p className="mt-4 max-w-[22rem] font-sans text-body text-on-surface-variant">{phase.step.note?.trim() ? phase.step.note : t(cueKey(phase.step, isRest))}</p>
         )}
+      </main>
+      ) : calmSport ? (
+      /* Yoga/pilates: linguagem calma (padrão Down Dog) — pose + hold + respiração,
+         sem cor de urgência nem linha de esforço. */
+      <main className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
+        <span className="font-sans text-label uppercase tracking-[0.14em] text-on-surface-variant">
+          {isRest ? t('meufit.training.guided.rest') : t(ROLE_KEY[phase.step.role])}
+          {phase.repeatLabel ? ` · ${phase.repeatLabel}` : ''}
+        </span>
+        {phase.step.label && !isRest ? <h1 className="mt-2 text-balance font-sans text-title-lg text-on-surface">{phase.step.label}</h1> : null}
+        <p className="mt-5 font-sans tabular-nums text-on-surface" style={{ fontSize: 'clamp(3.25rem, 20vw, 5.5rem)', lineHeight: 1 }}>
+          {isTimed ? formatClock(remaining) : phase.bound.by === 'reps' ? `${phase.bound.reps}` : formatClock(phaseElapsed)}
+        </p>
+        <p className="mt-1 font-sans text-body-sm text-on-surface-variant">{isTimed ? t('meufit.training.guided.byTime') : boundLabel(phase.bound, t)}</p>
+        <p className="mt-6 max-w-[22rem] font-sans text-body text-on-surface-variant">
+          {guided.plan.breathing
+            ? t('meufit.training.guided.breathe', { cue: guided.plan.breathing })
+            : phase.step.note?.trim() ? phase.step.note : t(cueKey(phase.step, isRest))}
+        </p>
       </main>
       ) : (
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">

@@ -204,3 +204,21 @@ describe('buildSessionSummary (review na unidade nativa)', () => {
     expect(summary.steps[1]).toEqual({ label: 'Principal', by: 'distance', meta: 100, realized: 200 });
   });
 });
+
+describe('applySportSpecifics — piscina e respiração', () => {
+  const base = { sessionType: '', objective: '', periodizationPhase: '', estimatedDuration: '', totalVolume: '', intensityModel: '', environment: '', equipment: '', monitoring: '', postWorkoutRecovery: '', interruptionCriteria: '' };
+  it('natação: poolLength "25m" vira poolLengthMeters 25', () => {
+    const g = toGuidedWorkout(workout({
+      trainingType: 'swimming',
+      prescription: { schemaVersion: 1, modality: 'swimming', session: base, specifics: { poolLength: '25m' }, blocks: [], steps: [{ kind: 'single', id: 's1', role: 'main', bound: { by: 'distance', meters: 200 }, target: { effort: 'moderate' } }] } as unknown as StudentWorkout['prescription'],
+    }));
+    expect(g!.poolLengthMeters).toBe(25);
+  });
+  it('yoga: specifics.breathing propaga para o plano', () => {
+    const g = toGuidedWorkout(workout({
+      trainingType: 'yoga',
+      prescription: { schemaVersion: 1, modality: 'yoga', session: base, specifics: { breathing: 'Ujjayi, 4 tempos' }, blocks: [], steps: [{ kind: 'single', id: 's1', role: 'main', bound: { by: 'time', seconds: 300 }, target: { effort: 'easy' } }] } as unknown as StudentWorkout['prescription'],
+    }));
+    expect(g!.breathing).toBe('Ujjayi, 4 tempos');
+  });
+});
