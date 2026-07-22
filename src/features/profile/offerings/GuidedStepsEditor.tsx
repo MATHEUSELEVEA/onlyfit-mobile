@@ -42,6 +42,16 @@ const ROLE_KEY: Record<StepRole, TranslationKey> = {
 
 type BoundBy = 'time' | 'distance' | 'reps' | 'open';
 
+/** Movimento de uma rodada HIIT/funcional. `keepBound` preserva um bound não-reps
+ *  (ex.: 30s de prancha) quando o campo de reps fica vazio — sem perda no round-trip. */
+interface MovementRow {
+  id: string;
+  label: string;
+  reps: string;
+  keepBound?: GuidedSingleStep['bound'];
+  keepNote?: string;
+}
+
 interface EditorRow {
   id: string;
   role: StepRole;
@@ -59,6 +69,7 @@ interface EditorRow {
   power: string; // watts (ciclismo)
   rest: string; // segundos
   repeat: string; // vezes
+  movements: MovementRow[]; // hiit/funcional: movimentos da rodada (repeat > 1)
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -75,6 +86,17 @@ const num = (value: string) => {
 function stepToRow(step: GuidedStep): EditorRow {
   const times = step.kind === 'repeat' ? step.times : 1;
   const single: GuidedSingleStep = step.kind === 'repeat' ? step.steps[0] : step;
+  // Rodada com vários movimentos: o descanso entre rodadas vive no último movimento.
+  const restSource: GuidedSingleStep = step.kind === 'repeat' ? step.steps[step.steps.length - 1] : single;
+  const movements: MovementRow[] = step.kind === 'repeat'
+    ? step.steps.map((inner) => ({
+        id: inner.id,
+        label: inner.label ?? '',
+        reps: inner.bound.by === 'reps' ? String(inner.bound.reps) : '',
+        keepBound: inner.bound.by === 'reps' ? undefined : inner.bound,
+        keepNote: inner.note,
+      }))
+    : [];
   const row: EditorRow = {
     id: step.id,
     role: single.role,
@@ -90,13 +112,14 @@ function stepToRow(step: GuidedStep): EditorRow {
     stroke: single.sport?.stroke ?? '',
     cadence: single.target?.cadence ? String(single.target.cadence) : '',
     power: single.target?.power ? String(single.target.power) : '',
-    rest: single.rest?.by === 'time' ? String(single.rest.seconds) : '',
+    rest: restSource.rest?.by === 'time' ? String(restSource.rest.seconds) : '',
     repeat: String(times),
+    movements,
   };
   return row;
 }
 
-function rowToStep(row: EditorRow): GuidedStep {
+function rowToStep(row: EditorRow, roundSport: boolean): GuidedStep {
   const bound = row.boundBy === 'time'
     ? { by: 'time' as const, seconds: Math.max(1, num(row.min) * 60 + num(row.sec)) }
     : row.boundBy === 'distance'
@@ -119,6 +142,24 @@ function rowToStep(row: EditorRow): GuidedStep {
     ...(restSec > 0 ? { rest: { by: 'time' as const, seconds: restSec } } : {}),
   };
   const times = Math.max(1, Math.round(num(row.repeat)));
+  // Rodada HIIT/funcional: cada movimento vira um passo do repeat; o descanso da
+  // linha entra no último movimento (= pausa entre rodadas). Outros esportes seguem
+  // no caminho single (preserva pace/estilo/distância do passo repetido).
+  if (roundSport && times > 1 && row.movements.length > 0) {
+    const steps: GuidedSingleStep[] = row.movements.map((movement, index) => ({
+      kind: 'single',
+      id: movement.id || `${row.id}-m${index}`,
+      role: row.role,
+      label: movement.label.trim() || undefined,
+      bound: movement.reps.trim()
+        ? { by: 'reps' as const, reps: Math.max(1, Math.round(num(movement.reps))) }
+        : movement.keepBound ?? { by: 'reps' as const, reps: 10 },
+      target: { effort: row.effort },
+      ...(movement.keepNote ? { note: movement.keepNote } : {}),
+      ...(index === row.movements.length - 1 && restSec > 0 ? { rest: { by: 'time' as const, seconds: restSec } } : {}),
+    }));
+    return { kind: 'repeat', id: row.id, times, steps };
+  }
   if (times > 1) return { kind: 'repeat', id: row.id, times, steps: [single] };
   return single;
 }
@@ -141,6 +182,7 @@ const newRow = (role: StepRole, sport: WorkoutTrainingType): EditorRow => ({
   power: '',
   rest: '',
   repeat: '1',
+  movements: [],
 });
 
 export function GuidedStepsEditor({ sport, steps, onChange }: { sport: WorkoutTrainingType; steps: GuidedStep[]; onChange: (steps: GuidedStep[]) => void }) {
@@ -148,8 +190,18 @@ export function GuidedStepsEditor({ sport, steps, onChange }: { sport: WorkoutTr
   const rows = useMemo(() => steps.map(stepToRow), [steps]);
   const showPace = PACE_SPORTS.includes(sport);
 
-  const commit = (nextRows: EditorRow[]) => onChange(nextRows.map(rowToStep));
+  const roundSport = sport === 'hiit' || sport === 'functional';
+  const isRound = (row: EditorRow) => roundSport && Math.round(num(row.repeat)) > 1 && row.movements.length > 0;
+
+  const commit = (nextRows: EditorRow[]) => onChange(nextRows.map((row) => rowToStep(row, roundSport)));
   const update = (id: string, patch: Partial<EditorRow>) => commit(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  /** Repetir > 1 em HIIT/funcional vira bloco de rodada: semeia o 1º movimento da própria linha. */
+  const updateRepeat = (row: EditorRow, repeat: string) => {
+    const seed = roundSport && Math.round(num(repeat)) > 1 && row.movements.length === 0
+      ? [{ id: crypto.randomUUID(), label: row.label, reps: row.reps || '10' }]
+      : row.movements;
+    update(row.id, { repeat, movements: seed });
+  };
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= rows.length) return;
@@ -196,7 +248,36 @@ export function GuidedStepsEditor({ sport, steps, onChange }: { sport: WorkoutTr
               </div>
             </div>
 
-            {/* Medir por + valor */}
+            {/* Rodada HIIT/funcional: lista de movimentos (nome + reps) */}
+            {isRound(row) ? (
+              <div className="mt-3">
+                <p className="font-sans text-body-sm text-on-surface-variant">{t('offer.workout.steps.movements')}</p>
+                <div className="mt-1.5 space-y-1.5">
+                  {row.movements.map((movement, movementIndex) => (
+                    <div key={movement.id} className="flex items-center gap-1.5">
+                      <input
+                        value={movement.label}
+                        placeholder={t('offer.workout.steps.movementName')}
+                        onChange={(event) => update(row.id, { movements: row.movements.map((entry, idx) => (idx === movementIndex ? { ...entry, label: event.target.value } : entry)) })}
+                        className={clsx(inputCls, 'flex-1')}
+                      />
+                      <input
+                        value={movement.reps}
+                        inputMode="numeric"
+                        placeholder="10"
+                        aria-label={t('offer.workout.steps.reps')}
+                        onChange={(event) => update(row.id, { movements: row.movements.map((entry, idx) => (idx === movementIndex ? { ...entry, reps: event.target.value } : entry)) })}
+                        className={clsx(inputCls, 'w-16 shrink-0 text-center')}
+                      />
+                      {row.movements.length > 1 ? (
+                        <button type="button" onClick={() => update(row.id, { movements: row.movements.filter((_, idx) => idx !== movementIndex) })} aria-label={t('offer.workout.steps.remove')} className="flex h-10 w-9 shrink-0 items-center justify-center text-error"><Trash2 size={16} aria-hidden /></button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={() => update(row.id, { movements: [...row.movements, { id: crypto.randomUUID(), label: '', reps: '10' }] })} className="mt-2 flex min-h-9 items-center gap-1 font-sans text-counter text-primary"><Plus size={14} aria-hidden />{t('offer.workout.steps.addMovement')}</button>
+              </div>
+            ) : (
             <div className="mt-3 grid grid-cols-2 gap-2">
               <label className="block min-w-0 font-sans text-body-sm text-on-surface-variant">
                 <span className="block truncate">{t('offer.workout.steps.by')}</span>
@@ -226,6 +307,7 @@ export function GuidedStepsEditor({ sport, steps, onChange }: { sport: WorkoutTr
                 <div className="flex items-end"><p className="pb-2 font-sans text-body-sm text-on-surface-variant">{t('meufit.training.guided.byOpen')}</p></div>
               )}
             </div>
+            )}
 
             {/* Campo do esporte (ritmo/estilo/cadência) + descanso + repetir */}
             <div className="mt-2 grid grid-cols-3 gap-2">
@@ -245,7 +327,7 @@ export function GuidedStepsEditor({ sport, steps, onChange }: { sport: WorkoutTr
                 </>
               ) : null}
               <label className="block min-w-0 font-sans text-body-sm text-on-surface-variant"><span className="block truncate">{t('offer.workout.steps.rest')}</span><input value={row.rest} inputMode="numeric" onChange={(event) => update(row.id, { rest: event.target.value })} className={clsx(inputCls, 'mt-1')} /></label>
-              <label className="block min-w-0 font-sans text-body-sm text-on-surface-variant"><span className="block truncate">{t('offer.workout.steps.repeat')}</span><input value={row.repeat} inputMode="numeric" onChange={(event) => update(row.id, { repeat: event.target.value })} className={clsx(inputCls, 'mt-1')} /></label>
+              <label className="block min-w-0 font-sans text-body-sm text-on-surface-variant"><span className="block truncate">{t('offer.workout.steps.repeat')}</span><input value={row.repeat} inputMode="numeric" onChange={(event) => updateRepeat(row, event.target.value)} className={clsx(inputCls, 'mt-1')} /></label>
             </div>
           </article>
         ))}
