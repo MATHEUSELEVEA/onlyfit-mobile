@@ -61,6 +61,10 @@ export interface GuidedWorkout {
   schemaVersion: 1;
   sport: WorkoutTrainingType;
   format?: GuidedFormat;
+  /** Natação: comprimento da piscina (m), para converter distância em voltas. */
+  poolLengthMeters?: number;
+  /** Yoga/pilates: instrução de respiração da prescrição, exibida no player. */
+  breathing?: string;
   steps: GuidedStep[];
 }
 
@@ -245,21 +249,27 @@ function applySportSpecifics(workout: GuidedWorkout, prescription: WorkoutPrescr
   const specifics = prescription?.specifics ?? {};
 
   if (workout.sport === 'swimming') {
+    const poolLengthMeters = parseDistanceToMeters(specifics.poolLength) ?? undefined;
     const defaultStroke = parseSwimStroke(specifics.stroke);
-    if (defaultStroke) {
-      const withStroke = (step: GuidedSingleStep): GuidedSingleStep =>
-        step.sport?.stroke ? step : { ...step, sport: { ...step.sport, stroke: defaultStroke } };
-      return {
-        ...workout,
-        steps: workout.steps.map((step) => (step.kind === 'repeat' ? { ...step, steps: step.steps.map(withStroke) } : withStroke(step))),
-      };
-    }
-    return workout;
+    const withStroke = (step: GuidedSingleStep): GuidedSingleStep =>
+      !defaultStroke || step.sport?.stroke ? step : { ...step, sport: { ...step.sport, stroke: defaultStroke } };
+    return {
+      ...workout,
+      ...(poolLengthMeters ? { poolLengthMeters } : {}),
+      steps: defaultStroke
+        ? workout.steps.map((step) => (step.kind === 'repeat' ? { ...step, steps: step.steps.map(withStroke) } : withStroke(step)))
+        : workout.steps,
+    };
   }
 
   if (workout.sport === 'hiit' || workout.sport === 'functional') {
     const format = workout.format ?? parseGuidedFormat(specifics.format);
     return format ? { ...workout, format } : workout;
+  }
+
+  if (workout.sport === 'yoga' || workout.sport === 'pilates') {
+    const breathing = specifics.breathing?.trim();
+    return breathing ? { ...workout, breathing } : workout;
   }
 
   return workout;
