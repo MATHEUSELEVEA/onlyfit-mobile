@@ -2,13 +2,13 @@ export type SocialPlatform = 'instagram' | 'youtube' | 'twitter' | 'tiktok' | 'w
 
 export type SocialLinks = Partial<Record<SocialPlatform, string>>;
 
-export const SOCIAL_PLATFORMS: { key: SocialPlatform; label: string; prefix: string; mark: string }[] = [
-  { key: 'instagram', label: 'Instagram', prefix: 'https://www.instagram.com/', mark: 'IG' },
-  { key: 'youtube', label: 'YouTube', prefix: 'https://www.youtube.com/', mark: 'YT' },
-  { key: 'twitter', label: 'X', prefix: 'https://x.com/', mark: 'X' },
-  { key: 'tiktok', label: 'TikTok', prefix: 'https://www.tiktok.com/@', mark: 'TT' },
-  { key: 'whatsapp', label: 'WhatsApp', prefix: 'https://wa.me/', mark: 'WA' },
-  { key: 'linkedin', label: 'LinkedIn', prefix: 'https://www.linkedin.com/in/', mark: 'IN' },
+export const SOCIAL_PLATFORMS: { key: SocialPlatform; label: string; prefix: string }[] = [
+  { key: 'instagram', label: 'Instagram', prefix: 'https://www.instagram.com/' },
+  { key: 'youtube', label: 'YouTube', prefix: 'https://www.youtube.com/' },
+  { key: 'twitter', label: 'X', prefix: 'https://x.com/' },
+  { key: 'tiktok', label: 'TikTok', prefix: 'https://www.tiktok.com/@' },
+  { key: 'whatsapp', label: 'WhatsApp', prefix: 'https://wa.me/' },
+  { key: 'linkedin', label: 'LinkedIn', prefix: 'https://www.linkedin.com/in/' },
 ];
 
 const PLATFORM_KEYS = new Set<SocialPlatform>(SOCIAL_PLATFORMS.map((item) => item.key));
