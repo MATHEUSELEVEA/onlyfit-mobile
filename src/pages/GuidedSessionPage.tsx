@@ -195,6 +195,15 @@ export function GuidedSessionPage() {
   const advance = useCallback(() => {
     const index = phaseIndexRef.current;
     const leaving = phasesRef.current[index];
+    // Marca o passo que está saindo como concluído: as visões Guiado e Lista
+    // compartilham o mesmo progresso, então concluir no foco reflete na lista.
+    setCheckedAt((current) => {
+      if (current[index] != null) return current;
+      const stamp = Math.max(0, Math.floor((Date.now() - (guided?.startedAt ?? Date.now())) / 1000));
+      const nextValue = { ...current, [index]: stamp };
+      checkedAtRef.current = nextValue;
+      return nextValue;
+    });
     if (leaving && leaving.type === 'work') {
       const elapsed = Math.max(0, Math.round((Date.now() - phaseStartedAtRef.current) / 1000));
       splitsRef.current = [...splitsRef.current, { label: leaving.step.label ?? '', seconds: elapsed }];
@@ -211,7 +220,7 @@ export function GuidedSessionPage() {
     }
     setPhaseIndex(next);
     setPhaseStartedAt(Date.now());
-  }, [openReview, calmSport]);
+  }, [openReview, calmSport, guided]);
 
   useEffect(() => {
     phasesRef.current = phases;
@@ -554,8 +563,10 @@ function ListSessionMain({ phases, sport, totalElapsed, checkedAt, onToggle }: {
     return acc;
   }, []);
   const totalPlanned = rows.length ? rows[rows.length - 1].end : 0;
-  const expectedIndex = rows.findIndex((r) => totalElapsed < r.end);
-  const currentRow = expectedIndex >= 0 ? rows[expectedIndex] : null;
+  // "Atual" = próximo passo NÃO marcado. Baseado na CONCLUSÃO, não no relógio:
+  // marcar (aqui ou no modo Guiado) avança o indicador. -1 = tudo concluído.
+  const currentIndex = rows.findIndex((_, index) => checkedAt[index] == null);
+  const currentRow = currentIndex >= 0 ? rows[currentIndex] : null;
   const checkedIndices = Object.keys(checkedAt).map(Number).sort((a, b) => a - b);
   // Tempo de cada linha marcada = do check anterior até este.
   const segmentFor = (rowIndex: number): number | null => {
@@ -572,15 +583,14 @@ function ListSessionMain({ phases, sport, totalElapsed, checkedAt, onToggle }: {
       </div>
       <ol className="space-y-2 pb-4">
         {rows.map((r, index) => {
-          const current = index === expectedIndex;
-          const behind = current ? Math.min(100, ((totalElapsed - r.start) / Math.max(1, r.dur)) * 100) : 0;
+          const current = index === currentIndex;
           const rest = r.phase.type === 'rest';
           const checked = checkedAt[index] != null;
           const segment = segmentFor(index);
           const measure = r.phase.bound.by === 'time' ? formatClock(r.phase.bound.seconds) : r.phase.bound.by === 'distance' ? formatDistance(r.phase.bound.meters) : r.phase.bound.by === 'reps' ? t('meufit.training.guided.byReps', { n: r.phase.bound.reps }) : formatClock(r.dur);
           return (
             <li key={index} className={clsx('relative overflow-hidden rounded-xl border', checked ? 'border-primary/50' : current ? 'border-primary' : 'border-outline-variant/30', rest ? 'bg-surface-container/50' : 'bg-surface-container')}>
-              {current && !checked ? <span className="absolute inset-y-0 left-0 bg-primary/10" style={{ width: `${behind}%` }} aria-hidden /> : null}
+              {current && !checked ? <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden /> : null}
               <div className="relative flex items-center gap-3 px-3 py-2.5">
                 <button
                   type="button"
