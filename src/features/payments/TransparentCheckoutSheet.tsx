@@ -47,6 +47,18 @@ async function fetchCheckoutStatus(transactionId: string) {
   return data as { status: PaymentStatus | null; settlement_status: string | null };
 }
 
+async function syncStripeCheckoutStatus(transactionId: string) {
+  const { data, error } = await supabase.functions.invoke('payment-stripe-checkout-sync', {
+    body: { transaction_id: transactionId },
+  });
+  if (error || !data || typeof data !== 'object') return null;
+  return data as { status: PaymentStatus | null; settlement_status: string | null };
+}
+
+function statusFromCheckoutRow(row: { status: PaymentStatus | null; settlement_status: string | null }) {
+  return (row.settlement_status === 'settled' ? 'settled' : row.status) as PaymentStatus | null;
+}
+
 /**
  * Mounts the sheet body only while open, so all checkout state (intents, request
  * keys, Stripe element) is created and discarded with the sheet — no reset effect.
@@ -72,6 +84,7 @@ function CheckoutSheetBody({
   const [cardData, setCardData] = useState<CheckoutData | null>(null);
   const [loadingMethod, setLoadingMethod] = useState<Method | null>(null);
   const [confirmingCard, setConfirmingCard] = useState(false);
+  const [cardSubmitted, setCardSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [copied, setCopied] = useState(false);
@@ -85,6 +98,17 @@ function CheckoutSheetBody({
 
   const data = method === 'card' ? cardData : pixData;
   const transactionId = cardData?.transaction_id ?? pixData?.transaction_id ?? null;
+
+  const applyCheckoutStatus = useCallback((row: { status: PaymentStatus | null; settlement_status: string | null } | null) => {
+    if (!row) return;
+    const next = statusFromCheckoutRow(row);
+    if (!next) return;
+    setStatus(next);
+    if (!confirmedRef.current && (next === 'confirmed' || next === 'settled')) {
+      confirmedRef.current = true;
+      onConfirmed?.();
+    }
+  }, [onConfirmed]);
 
   const start = useCallback(async (nextMethod: Method) => {
     if (!offeringId) return;
@@ -155,21 +179,16 @@ function CheckoutSheetBody({
     let active = true;
     const tick = async () => {
       const row = await fetchCheckoutStatus(transactionId);
-      if (!active || !row) return;
-      const next = (row.settlement_status === 'settled' ? 'settled' : row.status) as PaymentStatus | null;
-      if (!next) return;
-      setStatus(next);
-      if (!confirmedRef.current && (next === 'confirmed' || next === 'settled')) {
-        confirmedRef.current = true;
-        onConfirmed?.();
-      }
+      if (!active) return;
+      applyCheckoutStatus(row);
     };
+    void tick();
     const timer = window.setInterval(() => void tick(), POLL_INTERVAL_MS);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [confirmed, onConfirmed, status, transactionId]);
+  }, [applyCheckoutStatus, confirmed, status, transactionId]);
 
   const qrSrc = useMemo(() => {
     if (!pixData?.pix_qr_code_base64) return null;
@@ -204,7 +223,12 @@ function CheckoutSheetBody({
         redirect: 'if_required',
       });
       if (result.type === 'error') throw new Error(result.error.message);
+      setCardSubmitted(true);
+      if (transactionId) {
+        applyCheckoutStatus(await syncStripeCheckoutStatus(transactionId));
+      }
     } catch (confirmError) {
+      setCardSubmitted(false);
       const message = confirmError instanceof Error ? confirmError.message : '';
       setError(message && message !== 'not_ready' && message !== 'stripe_error' ? message : t('payments.checkout.startError'));
     } finally {
@@ -284,11 +308,21 @@ function CheckoutSheetBody({
             </div>
           ) : (
             <div className="space-y-3">
-              <div ref={stripeMountRef} className="min-h-40 rounded-2xl border border-outline-variant/30 bg-surface p-3" />
-              <button type="button" onClick={confirmCard} disabled={!cardData?.client_secret || confirmingCard || confirmed} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary disabled:opacity-60">
-                {confirmingCard ? <Loader2 size={17} className="animate-spin" aria-hidden /> : <CreditCard size={17} aria-hidden />}
-                {confirmed ? t('payments.checkout.confirmed') : t('payments.checkout.payCard')}
-              </button>
+              {cardSubmitted && !confirmed ? (
+                <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-outline-variant/30 bg-surface p-4 text-center">
+                  <Loader2 size={24} className="animate-spin text-primary" aria-hidden />
+                  <p className="mt-3 font-sans text-label text-on-surface">{t('payments.checkout.statusWaiting')}</p>
+                  <p className="mt-1 font-sans text-body-sm text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
+                </div>
+              ) : (
+                <>
+                  <div ref={stripeMountRef} className="min-h-40 rounded-2xl border border-outline-variant/30 bg-surface p-3" />
+                  <button type="button" onClick={confirmCard} disabled={!cardData?.client_secret || confirmingCard || confirmed} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary disabled:opacity-60">
+                    {confirmingCard ? <Loader2 size={17} className="animate-spin" aria-hidden /> : <CreditCard size={17} aria-hidden />}
+                    {confirmed ? t('payments.checkout.confirmed') : t('payments.checkout.payCard')}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
