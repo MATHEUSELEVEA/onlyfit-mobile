@@ -1,112 +1,139 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import {
+  loadStripe,
+  type Stripe,
+  type StripeElements,
+  type StripePaymentElement,
+} from '@stripe/stripe-js';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { TextField } from '@/components/ui/TextField';
 import { useTranslation } from '@/i18n/I18nProvider';
-import { formatCep } from '@/lib/masks';
-import { formatCpf, isValidCpf, normalizeCpf } from '@/lib/cpf';
-import { useSensitiveProfile } from '@/features/profile/useSensitiveProfile';
-import { useAddPaymentCard } from './usePaymentCards';
+import { useSaveStripePaymentCard, useStartStripeCardSetup } from './usePaymentCards';
 
 interface AddCardSheetProps {
   open: boolean;
   onClose: () => void;
 }
 
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, '');
-}
-
-function groupCardNumber(value: string): string {
-  return digitsOnly(value).slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+function newRequestKey(): string {
+  return `card_setup_${crypto.randomUUID()}`;
 }
 
 export function AddCardSheet({ open, onClose }: AddCardSheetProps) {
   const { t } = useTranslation();
-  const { data: sensitive } = useSensitiveProfile();
-  const addCard = useAddPaymentCard();
+  const startSetup = useStartStripeCardSetup();
+  const saveCard = useSaveStripePaymentCard();
 
-  const [holderName, setHolderName] = useState('');
-  const [number, setNumber] = useState('');
-  const [expiryMonth, setExpiryMonth] = useState('');
-  const [expiryYear, setExpiryYear] = useState('');
-  const [ccv, setCcv] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [addressNumber, setAddressNumber] = useState('');
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const paymentElementRef = useRef<StripePaymentElement | null>(null);
+  const stripeRef = useRef<Stripe | null>(null);
+  const elementsRef = useRef<StripeElements | null>(null);
+  const setupIntentIdRef = useRef<string | null>(null);
+  const requestKeyRef = useRef<string>(newRequestKey());
+
   const [nickname, setNickname] = useState('');
+  const [loadingElement, setLoadingElement] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const profileCpf = normalizeCpf(sensitive?.taxId ?? sensitive?.cpfCnpj ?? '');
-  const effectiveCpf = normalizeCpf(cpf) || profileCpf;
-  const cpfLocked = profileCpf.length === 11;
+  const busy = loadingElement || startSetup.isPending || saveCard.isPending;
+  const canSubmit = useMemo(() => ready && !busy, [busy, ready]);
 
-  const cardDigits = digitsOnly(number);
-  const canSubmit = useMemo(
-    () =>
-      holderName.trim().length >= 2 &&
-      cardDigits.length >= 13 &&
-      Number(expiryMonth) >= 1 &&
-      Number(expiryMonth) <= 12 &&
-      expiryYear.length === 4 &&
-      ccv.length >= 3 &&
-      postalCode.length === 8 &&
-      addressNumber.trim().length > 0 &&
-      isValidCpf(effectiveCpf),
-    [holderName, cardDigits, expiryMonth, expiryYear, ccv, postalCode, addressNumber, effectiveCpf],
-  );
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+
+    async function mountStripeElement() {
+      setError(null);
+      setReady(false);
+      setLoadingElement(true);
+      try {
+        const setup = await startSetup.mutateAsync({ requestKey: requestKeyRef.current });
+        if (cancelled || !mountRef.current) return;
+        setupIntentIdRef.current = setup.setupIntentId;
+
+        const stripe = await loadStripe(setup.publishableKey);
+        if (!stripe || cancelled || !mountRef.current) return;
+        stripeRef.current = stripe;
+
+        const elements = stripe.elements({ clientSecret: setup.clientSecret });
+        elementsRef.current = elements;
+
+        const paymentElement = elements.create('payment', {
+          fields: { billingDetails: { name: 'auto', email: 'auto' } },
+          layout: 'tabs',
+        });
+        paymentElement.on('ready', () => {
+          if (!cancelled) setReady(true);
+        });
+        paymentElement.mount(mountRef.current);
+        paymentElementRef.current = paymentElement;
+      } catch (setupError) {
+        if (!cancelled) {
+          setError(setupError instanceof Error ? setupError.message : t('payments.card.form.invalid'));
+        }
+      } finally {
+        if (!cancelled) setLoadingElement(false);
+      }
+    }
+
+    void mountStripeElement();
+    return () => {
+      cancelled = true;
+      paymentElementRef.current?.destroy();
+      paymentElementRef.current = null;
+      stripeRef.current = null;
+      elementsRef.current = null;
+      setupIntentIdRef.current = null;
+    };
+  // Mount once per sheet open; mutation objects update during their own loading state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   function reset() {
-    setHolderName('');
-    setNumber('');
-    setExpiryMonth('');
-    setExpiryYear('');
-    setCcv('');
-    setCpf('');
-    setPostalCode('');
-    setAddressNumber('');
     setNickname('');
     setError(null);
+    setReady(false);
+    requestKeyRef.current = newRequestKey();
   }
 
   function handleClose() {
-    if (addCard.isPending) return;
+    if (busy) return;
     reset();
     onClose();
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     setError(null);
-    if (!canSubmit) {
+    const stripe = stripeRef.current;
+    const elements = elementsRef.current;
+    if (!stripe || !elements || !setupIntentIdRef.current) {
       setError(t('payments.card.form.invalid'));
       return;
     }
-    addCard.mutate(
-      {
-        card: {
-          holderName: holderName.trim(),
-          number: cardDigits,
-          expiryMonth: expiryMonth.padStart(2, '0'),
-          expiryYear,
-          ccv,
+
+    try {
+      const result = await stripe.confirmSetup({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+          payment_method_data: { allow_redisplay: 'always' },
         },
-        holderInfo: {
-          cpfCnpj: effectiveCpf,
-          postalCode,
-          addressNumber: addressNumber.trim(),
-        },
+        redirect: 'if_required',
+      });
+      if (result.error) throw new Error(result.error.message || t('payments.card.form.invalid'));
+
+      const setupIntentId = result.setupIntent?.id ?? setupIntentIdRef.current;
+      await saveCard.mutateAsync({
+        setupIntentId,
         nickname: nickname.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          reset();
-          onClose();
-        },
-        onError: (mutationError) => {
-          setError(mutationError instanceof Error ? mutationError.message : t('payments.card.form.invalid'));
-        },
-      },
-    );
+      });
+      reset();
+      onClose();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : t('payments.card.form.invalid'));
+    }
   }
 
   return (
@@ -115,79 +142,18 @@ export function AddCardSheet({ open, onClose }: AddCardSheetProps) {
       onClose={handleClose}
       title={t('payments.card.form.title')}
       description={t('payments.card.form.subtitle')}
-      panelClassName="h-[92%]"
+      panelClassName="h-[76%]"
     >
       <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-6 pt-2">
-        <TextField
-          label={t('payments.card.form.holderName')}
-          value={holderName}
-          onChange={(event) => setHolderName(event.target.value)}
-          autoComplete="cc-name"
-          maxLength={80}
-        />
-        <TextField
-          label={t('payments.card.form.number')}
-          value={groupCardNumber(number)}
-          onChange={(event) => setNumber(digitsOnly(event.target.value).slice(0, 16))}
-          inputMode="numeric"
-          autoComplete="cc-number"
-          maxLength={19}
-          placeholder="0000 0000 0000 0000"
-        />
-        <div className="grid grid-cols-3 gap-3">
-          <TextField
-            label={t('payments.card.form.expiryMonth')}
-            value={expiryMonth}
-            onChange={(event) => setExpiryMonth(digitsOnly(event.target.value).slice(0, 2))}
-            inputMode="numeric"
-            maxLength={2}
-            placeholder="MM"
-          />
-          <TextField
-            label={t('payments.card.form.expiryYear')}
-            value={expiryYear}
-            onChange={(event) => setExpiryYear(digitsOnly(event.target.value).slice(0, 4))}
-            inputMode="numeric"
-            maxLength={4}
-            placeholder="AAAA"
-          />
-          <TextField
-            label={t('payments.card.form.ccv')}
-            value={ccv}
-            onChange={(event) => setCcv(digitsOnly(event.target.value).slice(0, 4))}
-            inputMode="numeric"
-            autoComplete="cc-csc"
-            maxLength={4}
-            placeholder="CVV"
-          />
+        <div className="min-h-40 rounded-2xl border border-outline-variant/30 bg-surface p-3">
+          <div ref={mountRef} />
+          {loadingElement && (
+            <div className="flex min-h-32 items-center justify-center">
+              <Loader2 size={22} className="animate-spin text-primary" aria-label={t('payments.loading')} />
+            </div>
+          )}
         </div>
-        <TextField
-          label={t('payments.card.form.cpf')}
-          value={cpfLocked ? formatCpf(profileCpf) : formatCpf(normalizeCpf(cpf))}
-          onChange={(event) => setCpf(normalizeCpf(event.target.value))}
-          disabled={cpfLocked}
-          inputMode="numeric"
-          maxLength={14}
-          hint={cpfLocked ? t('payments.card.form.cpfLocked') : undefined}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <TextField
-            label={t('payments.card.form.postalCode')}
-            value={formatCep(postalCode)}
-            onChange={(event) => setPostalCode(digitsOnly(event.target.value).slice(0, 8))}
-            inputMode="numeric"
-            autoComplete="postal-code"
-            maxLength={9}
-            placeholder="00000-000"
-          />
-          <TextField
-            label={t('payments.card.form.addressNumber')}
-            value={addressNumber}
-            onChange={(event) => setAddressNumber(event.target.value.slice(0, 12))}
-            inputMode="numeric"
-            maxLength={12}
-          />
-        </div>
+
         <TextField
           label={t('payments.card.form.nickname')}
           value={nickname}
@@ -207,11 +173,11 @@ export function AddCardSheet({ open, onClose }: AddCardSheetProps) {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!canSubmit || addCard.isPending}
+          disabled={!canSubmit}
           className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
         >
-          {addCard.isPending && <Loader2 size={16} className="animate-spin" aria-hidden />}
-          {addCard.isPending ? t('payments.card.form.saving') : t('payments.card.form.submit')}
+          {busy && <Loader2 size={16} className="animate-spin" aria-hidden />}
+          {busy ? t('payments.card.form.saving') : t('payments.card.form.submit')}
         </button>
       </div>
     </BottomSheet>

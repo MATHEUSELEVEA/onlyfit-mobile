@@ -2,17 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-// Cartões tokenizados do usuário. O token vive só no servidor (column-level
-// security em payment_cards); o cliente só lê os metadados seguros e escreve
-// via edge function (tokenização) ou RPCs SECURITY DEFINER (principal/apelido/
-// exclusão). Ver docs de pagamentos no repo onlyfit-supabase.
+// Cartões tokenizados do usuário. O token vive só no servidor/processador
+// (column-level security em payment_cards); o cliente só lê os metadados seguros
+// e salva cartões Stripe via SetupIntent, sem enviar PAN/CVV ao backend.
 export interface PaymentCard {
   id: string;
+  provider: 'asaas' | 'stripe';
   brand: string | null;
   last4: string;
   holderName: string | null;
   nickname: string | null;
   isDefault: boolean;
+  expMonth: number | null;
+  expYear: number | null;
   createdAt: string;
 }
 
@@ -22,20 +24,26 @@ export function paymentCardsQueryKey(userId: string | undefined) {
 
 function mapRow(row: {
   id: string;
+  provider: 'asaas' | 'stripe';
   brand: string | null;
   last4: string;
   holder_name: string | null;
   nickname: string | null;
   is_default: boolean;
+  exp_month: number | null;
+  exp_year: number | null;
   created_at: string;
 }): PaymentCard {
   return {
     id: row.id,
+    provider: row.provider,
     brand: row.brand,
     last4: row.last4,
     holderName: row.holder_name,
     nickname: row.nickname,
     isDefault: row.is_default,
+    expMonth: row.exp_month,
+    expYear: row.exp_year,
     createdAt: row.created_at,
   };
 }
@@ -50,7 +58,7 @@ export function usePaymentCards() {
     queryFn: async (): Promise<PaymentCard[]> => {
       const { data, error } = await supabase
         .from('payment_cards')
-        .select('id, brand, last4, holder_name, nickname, is_default, created_at')
+        .select('id, provider, brand, last4, holder_name, nickname, is_default, exp_month, exp_year, created_at')
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -59,22 +67,14 @@ export function usePaymentCards() {
   });
 }
 
-export interface AddCardInput {
-  card: {
-    holderName: string;
-    number: string;
-    expiryMonth: string;
-    expiryYear: string;
-    ccv: string;
-  };
-  holderInfo: {
-    name?: string;
-    email?: string;
-    cpfCnpj?: string;
-    postalCode: string;
-    addressNumber: string;
-    phone?: string;
-  };
+export interface StripeSetupIntentStart {
+  setupIntentId: string;
+  clientSecret: string;
+  publishableKey: string;
+}
+
+export interface SaveStripeCardInput {
+  setupIntentId: string;
   nickname?: string;
 }
 
@@ -83,60 +83,78 @@ export function mapAddCardError(code: string | undefined): string {
   switch (code) {
     case 'payment_platform_not_configured':
       return 'O pagamento ainda não está ativo na plataforma. Tente novamente mais tarde.';
-    case 'payment_card_tokenization_not_enabled':
-      return 'O cadastro de cartão ainda não está habilitado no Asaas da OnlyFit.';
-    case 'invalid_card_number':
-      return 'Número do cartão inválido.';
-    case 'invalid_expiry':
-      return 'Validade do cartão inválida.';
-    case 'invalid_ccv':
-      return 'Código de segurança (CVV) inválido.';
-    case 'invalid_holder_name':
-      return 'Informe o nome impresso no cartão.';
-    case 'invalid_postal_code':
-      return 'CEP inválido.';
-    case 'invalid_address_number':
-      return 'Informe o número do endereço.';
-    case 'invalid_cpf':
-    case 'cpf_required':
-      return 'Informe um CPF válido do titular.';
-    case 'email_required':
-      return 'Informe um e-mail para o titular.';
+    case 'idempotency_required':
+    case 'invalid_setup_intent':
+      return 'Não foi possível iniciar a tokenização do cartão. Tente novamente.';
+    case 'setup_intent_not_succeeded':
+      return 'Confirme o cartão antes de salvar.';
+    case 'payment_method_not_card':
+      return 'Use um cartão válido.';
+    case 'stripe_error':
+      return 'Não foi possível validar o cartão na Stripe.';
     case 'card_limit_reached':
       return 'Você atingiu o limite de cartões cadastrados.';
-    case 'asaas_error':
-      return 'Não foi possível validar o cartão no processador de pagamentos.';
+    case 'card_already_registered':
+      return 'Este cartão já está cadastrado.';
     default:
       return 'Não foi possível cadastrar o cartão. Tente novamente.';
   }
 }
 
-export function useAddPaymentCard() {
+async function readFunctionError(error: unknown): Promise<string | undefined> {
+  try {
+    const context = (error as { context?: Response }).context;
+    if (context && typeof context.json === 'function') {
+      const body = await context.json();
+      return body?.error;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+export function useStartStripeCardSetup() {
+  return useMutation({
+    mutationFn: async (input: { requestKey: string }): Promise<StripeSetupIntentStart> => {
+      const { data, error } = await supabase.functions.invoke<{
+        ok?: boolean;
+        error?: string;
+        setup_intent_id?: string;
+        client_secret?: string;
+        publishable_key?: string;
+      }>('payment-stripe-setup-intent-start', { body: { request_key: input.requestKey } });
+      if (error) throw new Error(mapAddCardError(await readFunctionError(error)));
+      if (data?.ok !== true || !data.setup_intent_id || !data.client_secret || !data.publishable_key) {
+        throw new Error(mapAddCardError(data?.error));
+      }
+      return {
+        setupIntentId: data.setup_intent_id,
+        clientSecret: data.client_secret,
+        publishableKey: data.publishable_key,
+      };
+    },
+  });
+}
+
+export function useSaveStripePaymentCard() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const userId = session?.user.id;
 
   return useMutation({
-    mutationFn: async (input: AddCardInput) => {
+    mutationFn: async (input: SaveStripeCardInput) => {
       const { data, error } = await supabase.functions.invoke<{
         ok?: boolean;
         error?: string;
         message?: string;
-      }>('payment-tokenize-card', { body: input });
-      if (error) {
-        // A edge function devolve o código de erro no corpo mesmo em status !=2xx.
-        let code: string | undefined;
-        try {
-          const context = (error as { context?: Response }).context;
-          if (context && typeof context.json === 'function') {
-            const body = await context.json();
-            code = body?.error;
-          }
-        } catch {
-          code = undefined;
-        }
-        throw new Error(mapAddCardError(code));
-      }
+      }>('payment-stripe-card-save', {
+        body: {
+          setup_intent_id: input.setupIntentId,
+          nickname: input.nickname,
+        },
+      });
+      if (error) throw new Error(mapAddCardError(await readFunctionError(error)));
       if (data?.ok !== true) throw new Error(mapAddCardError(data?.error));
     },
     onSuccess: () => {
