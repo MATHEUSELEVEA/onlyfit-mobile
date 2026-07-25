@@ -92,6 +92,7 @@ function CheckoutSheetBody({
   const [copied, setCopied] = useState(false);
   const stripeMountRef = useRef<HTMLDivElement | null>(null);
   const checkoutRef = useRef<StripeCheckoutElementsSdk | null>(null);
+  const stripeElementRef = useRef<StripePaymentElement | null>(null);
   const confirmedRef = useRef(false);
   /** Without this guard a failed start re-fires the effect forever and burns the 6/min rate limit. */
   const attemptedRef = useRef<Record<Method, boolean>>({ pix: false, card: false });
@@ -162,6 +163,7 @@ function CheckoutSheetBody({
         if (cancelled || !stripeMountRef.current) return;
         checkoutRef.current = checkout;
         element = checkout.createPaymentElement();
+        stripeElementRef.current = element;
         element.mount(stripeMountRef.current);
       } catch {
         if (!cancelled) setError(t('payments.checkout.startError'));
@@ -170,6 +172,7 @@ function CheckoutSheetBody({
     return () => {
       cancelled = true;
       element?.destroy();
+      if (stripeElementRef.current === element) stripeElementRef.current = null;
       checkoutRef.current = null;
     };
   }, [cardData, method, t]);
@@ -178,6 +181,9 @@ function CheckoutSheetBody({
 
   useEffect(() => {
     if (!confirmed) return undefined;
+    stripeElementRef.current?.destroy();
+    stripeElementRef.current = null;
+    checkoutRef.current = null;
     const timer = window.setTimeout(onClose, CONFIRMED_CLOSE_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [confirmed, onClose]);
@@ -250,6 +256,39 @@ function CheckoutSheetBody({
       ? t('payments.checkout.statusFailed')
       : t('payments.checkout.statusWaiting');
 
+  if (confirmed) {
+    return (
+      <div className="fixed inset-0 z-[var(--z-sheet)] flex items-end bg-black/45">
+        <section className="w-full rounded-t-3xl bg-background px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-4">
+          <header className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="font-sans text-title text-on-surface">{title}</h2>
+              <p className="mt-1 font-sans text-body-sm text-on-surface-variant">{amountLabel}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t('payments.checkout.close')}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface"
+            >
+              <X size={18} aria-hidden />
+            </button>
+          </header>
+
+          <div className="mt-6 flex min-h-56 flex-col items-center justify-center text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <CheckCircle2 size={30} strokeWidth={1.8} aria-hidden />
+            </span>
+            <p className="mt-4 font-sans text-title text-on-surface">{t('payments.checkout.confirmed')}</p>
+            <p className="mt-1 max-w-64 font-sans text-body-sm text-on-surface-variant">
+              {t('payments.checkout.confirmedHint')}
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[var(--z-sheet)] flex items-end bg-black/45">
       <section className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-background p-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
@@ -316,17 +355,7 @@ function CheckoutSheetBody({
             </div>
           ) : (
             <div className="space-y-3">
-              {confirmed ? (
-                <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-primary/20 bg-surface p-5 text-center">
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <CheckCircle2 size={30} strokeWidth={1.8} aria-hidden />
-                  </span>
-                  <p className="mt-4 font-sans text-title text-on-surface">{t('payments.checkout.confirmed')}</p>
-                  <p className="mt-1 max-w-64 font-sans text-body-sm text-on-surface-variant">
-                    {t('payments.checkout.confirmedHint')}
-                  </p>
-                </div>
-              ) : cardSubmitted ? (
+              {cardSubmitted ? (
                 <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-outline-variant/30 bg-surface p-4 text-center">
                   <Loader2 size={24} className="animate-spin text-primary" aria-hidden />
                   <p className="mt-3 font-sans text-label text-on-surface">{t('payments.checkout.statusWaiting')}</p>
@@ -345,14 +374,10 @@ function CheckoutSheetBody({
           )}
         </div>
 
-        {!confirmed && (
-          <>
-            <p className="mt-4 rounded-2xl bg-surface-container px-3 py-2 font-sans text-body-sm text-on-surface-variant" aria-live="polite">
-              {statusLabel}
-            </p>
-            <p className="mt-2 font-sans text-counter text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
-          </>
-        )}
+        <p className="mt-4 rounded-2xl bg-surface-container px-3 py-2 font-sans text-body-sm text-on-surface-variant" aria-live="polite">
+          {statusLabel}
+        </p>
+        <p className="mt-2 font-sans text-counter text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
       </section>
     </div>
   );
