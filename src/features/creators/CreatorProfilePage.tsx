@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   Play,
   Share2,
+  Sparkles,
   ShoppingBag,
   Trophy,
   Users,
@@ -311,20 +312,35 @@ export function CreatorProfilePage() {
             aria-pressed={subscribed}
             disabled={isOwnProfile}
             className={clsx(
-              'inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full font-sans text-label transition-all active:scale-[0.98] disabled:opacity-60',
+              'relative inline-flex min-h-[46px] flex-1 items-center justify-center overflow-hidden rounded-full font-sans text-label transition-all active:scale-[0.985] disabled:opacity-60',
               subscribed
                 ? 'border border-outline-variant/60 bg-surface-container-low text-on-surface'
-                : 'bg-primary text-on-primary shadow-sm',
+                : 'border border-primary/45 bg-on-surface text-background shadow-[0_10px_30px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-white/10',
             )}
           >
+            {!subscribed && (
+              <>
+                <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-primary/80 to-transparent" aria-hidden />
+                <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,255,0,0.24),transparent_54%)]" aria-hidden />
+              </>
+            )}
             {subscribed ? (
               <>
                 <Check size={15} strokeWidth={3} aria-hidden /> Assinado
               </>
             ) : subPrice > 0 ? (
-              `Assinar · ${formatPrice(subPrice)}`
+              <span className="relative z-10 inline-flex w-full items-center justify-center gap-2 px-3">
+                <Sparkles size={15} strokeWidth={2.2} className="text-primary" aria-hidden />
+                <span className="text-white">Assinar</span>
+                <span className="rounded-full bg-primary px-2 py-0.5 font-sans text-counter text-on-primary">
+                  {formatPrice(subPrice)}
+                </span>
+              </span>
             ) : (
-              'Assinar'
+              <span className="relative z-10 inline-flex items-center gap-2 px-3">
+                <Sparkles size={15} strokeWidth={2.2} className="text-primary" aria-hidden />
+                <span className="text-white">Assinar</span>
+              </span>
             )}
           </button>
           {!isOwnProfile && (
