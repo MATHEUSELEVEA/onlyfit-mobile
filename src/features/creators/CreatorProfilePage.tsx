@@ -38,7 +38,7 @@ import type { FeedAuthor } from '@/features/feed/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreatorFollowState, useToggleCreatorFollow } from './useCreatorFollow';
 import { useCreatorSubscription } from './useCreatorSubscription';
-import { OfferingCheckoutError, useOfferingCheckout } from '@/features/payments/useOfferingCheckout';
+import { TransparentCheckoutSheet } from '@/features/payments/TransparentCheckoutSheet';
 import {
   useCreatorChallenges,
   useCreatorCommunities,
@@ -153,12 +153,12 @@ export function CreatorProfilePage() {
   const { data: isBlocked = false, isLoading: isBlockStateLoading } = useUserBlockState(creatorId);
   const { data: hasBlockedTarget = false } = useOwnUserBlockState(creatorId);
   const toggleFollow = useToggleCreatorFollow(creatorId);
-  const checkout = useOfferingCheckout();
   const blockMutation = useBlockUser(creatorId);
   const unblockMutation = useUnblockUser(creatorId);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   function handleSubscribeClick() {
-    if (subscribed || checkout.isPending) return;
+    if (subscribed) return;
     if (isOwnProfile) {
       setSubscribeNotice('Você não pode assinar o próprio perfil.');
       return;
@@ -168,29 +168,13 @@ export function CreatorProfilePage() {
       return;
     }
     setSubscribeNotice(null);
-    checkout.mutate(
-      { offeringId: premiumOffering.id, billingType: premiumOffering.billingType },
-      {
-        onSuccess: () => {
-          setSubscribeNotice('Assinatura criada. A confirmação do pagamento aparecerá em Pagamentos.');
-          void queryClient.invalidateQueries({ queryKey: ['creator-subscription', creatorId, session?.user.id] });
-          void queryClient.invalidateQueries({ queryKey: ['payment-transactions', session?.user.id] });
-        },
-        onError: (error) => {
-          const code = error instanceof OfferingCheckoutError ? error.code : '';
-          if (code === 'card_required' || code === 'payment_customer_required') {
-            setSubscribeNotice('Cadastre um cartão principal para concluir a assinatura.');
-            navigate('/perfil/pagamentos?adicionarCartao=1');
-            return;
-          }
-          if (code === 'invalid_professional') {
-            setSubscribeNotice('Você não pode assinar o próprio perfil.');
-            return;
-          }
-          setSubscribeNotice('Não foi possível iniciar a assinatura. Tente novamente.');
-        },
-      },
-    );
+    setCheckoutOpen(true);
+  }
+
+  function handleCheckoutConfirmed() {
+    setSubscribeNotice('Pagamento confirmado. Seu acesso será atualizado automaticamente.');
+    void queryClient.invalidateQueries({ queryKey: ['creator-subscription', creatorId, session?.user.id] });
+    void queryClient.invalidateQueries({ queryKey: ['payment-transactions', session?.user.id] });
   }
 
   const subPrice = premiumOffering?.price ?? creator.subscriptionPrice;
@@ -323,7 +307,7 @@ export function CreatorProfilePage() {
             type="button"
             onClick={handleSubscribeClick}
             aria-pressed={subscribed}
-            disabled={checkout.isPending || isOwnProfile}
+            disabled={isOwnProfile}
             className={clsx(
               'inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full font-sans text-label transition-all active:scale-[0.98] disabled:opacity-60',
               subscribed
@@ -331,11 +315,7 @@ export function CreatorProfilePage() {
                 : 'bg-primary text-on-primary shadow-sm',
             )}
           >
-            {checkout.isPending ? (
-              <>
-                <Loader2 size={15} className="animate-spin" aria-hidden /> Assinando
-              </>
-            ) : subscribed ? (
+            {subscribed ? (
               <>
                 <Check size={15} strokeWidth={3} aria-hidden /> Assinado
               </>
@@ -445,6 +425,17 @@ export function CreatorProfilePage() {
       />
       <ReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} url={shareUrl} text={shareText} />
+      {premiumOffering ? (
+        <TransparentCheckoutSheet
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          offeringId={premiumOffering.id}
+          billingType={premiumOffering.billingType === 'recurring' ? 'recurring' : 'one_time'}
+          title={creator.displayName ?? `@${creator.username}`}
+          amountLabel={formatPrice(subPrice)}
+          onConfirmed={handleCheckoutConfirmed}
+        />
+      ) : null}
     </div>
   );
 }
