@@ -39,11 +39,10 @@ function edgeType(billingType: BillingType): 'one_time' | 'subscription' {
  * grant on payment_transactions — it was revoked on purpose in the financial ledger migration.
  */
 async function fetchCheckoutStatus(transactionId: string) {
-  const rpc = supabase.rpc as unknown as (
-    fn: string,
-    params: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: unknown }>;
-  const { data, error } = await rpc('get_my_checkout_status', { p_transaction_id: transactionId });
+  const { data, error } = await supabase.rpc('get_my_checkout_status', { p_transaction_id: transactionId }) as {
+    data: unknown;
+    error: unknown;
+  };
   if (error || !data || typeof data !== 'object') return null;
   return data as { status: PaymentStatus | null; settlement_status: string | null };
 }
