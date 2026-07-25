@@ -16,6 +16,7 @@ import {
   type OfferingStatus,
 } from '../useBusinessOfferings';
 import { TransparentCheckoutSheet } from '@/features/payments/TransparentCheckoutSheet';
+import { usePaymentPreload } from '@/features/payments/usePaymentPreload';
 
 function mapOfferingError(error: unknown, t: (key: TranslationKey) => string): string {
   const message = error instanceof Error ? error.message : '';
@@ -54,6 +55,7 @@ export function BusinessOfferingsSection({
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<OfferingType | null>(null);
   const [checkoutOffering, setCheckoutOffering] = useState<BusinessOffering | null>(null);
+  usePaymentPreload(!canManage && offerings.some((offering) => offering.status === 'active' && offering.price != null));
 
   const typeBySlug = new Map(types.map((type) => [type.slug, type]));
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, CreditCard, Loader2, QrCode, X } from 'lucide-react';
+import { CheckCircle2, Copy, CreditCard, Loader2, QrCode, X } from 'lucide-react';
 import type { StripeCheckoutElementsSdk, StripePaymentElement } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabase';
 import { loadOnlyFitStripe } from '@/lib/stripe';
@@ -30,6 +30,7 @@ interface TransparentCheckoutSheetProps {
 }
 
 const POLL_INTERVAL_MS = 3500;
+const CONFIRMED_CLOSE_DELAY_MS = 2200;
 
 function edgeType(billingType: BillingType): 'one_time' | 'subscription' {
   return billingType === 'recurring' ? 'subscription' : 'one_time';
@@ -176,6 +177,12 @@ function CheckoutSheetBody({
   const confirmed = status === 'confirmed' || status === 'settled';
 
   useEffect(() => {
+    if (!confirmed) return undefined;
+    const timer = window.setTimeout(onClose, CONFIRMED_CLOSE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [confirmed, onClose]);
+
+  useEffect(() => {
     if (!transactionId || confirmed || status === 'failed') return;
     let active = true;
     const tick = async () => {
@@ -309,7 +316,17 @@ function CheckoutSheetBody({
             </div>
           ) : (
             <div className="space-y-3">
-              {cardSubmitted && !confirmed ? (
+              {confirmed ? (
+                <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-primary/20 bg-surface p-5 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <CheckCircle2 size={30} strokeWidth={1.8} aria-hidden />
+                  </span>
+                  <p className="mt-4 font-sans text-title text-on-surface">{t('payments.checkout.confirmed')}</p>
+                  <p className="mt-1 max-w-64 font-sans text-body-sm text-on-surface-variant">
+                    {t('payments.checkout.confirmedHint')}
+                  </p>
+                </div>
+              ) : cardSubmitted ? (
                 <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-outline-variant/30 bg-surface p-4 text-center">
                   <Loader2 size={24} className="animate-spin text-primary" aria-hidden />
                   <p className="mt-3 font-sans text-label text-on-surface">{t('payments.checkout.statusWaiting')}</p>
@@ -320,7 +337,7 @@ function CheckoutSheetBody({
                   <div ref={stripeMountRef} className="min-h-40 rounded-2xl border border-outline-variant/30 bg-surface p-3" />
                   <button type="button" onClick={confirmCard} disabled={!cardData?.client_secret || confirmingCard || confirmed} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary disabled:opacity-60">
                     {confirmingCard ? <Loader2 size={17} className="animate-spin" aria-hidden /> : <CreditCard size={17} aria-hidden />}
-                    {confirmed ? t('payments.checkout.confirmed') : t('payments.checkout.payCard')}
+                    {t('payments.checkout.payCard')}
                   </button>
                 </>
               )}
@@ -328,10 +345,14 @@ function CheckoutSheetBody({
           )}
         </div>
 
-        <p className="mt-4 rounded-2xl bg-surface-container px-3 py-2 font-sans text-body-sm text-on-surface-variant" aria-live="polite">
-          {statusLabel}
-        </p>
-        <p className="mt-2 font-sans text-counter text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
+        {!confirmed && (
+          <>
+            <p className="mt-4 rounded-2xl bg-surface-container px-3 py-2 font-sans text-body-sm text-on-surface-variant" aria-live="polite">
+              {statusLabel}
+            </p>
+            <p className="mt-2 font-sans text-counter text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
+          </>
+        )}
       </section>
     </div>
   );
