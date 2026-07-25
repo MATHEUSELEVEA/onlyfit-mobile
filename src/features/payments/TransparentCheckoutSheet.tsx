@@ -202,7 +202,6 @@ function CheckoutSheetBody({
       // navigating away; only genuinely redirect-based methods leave the sheet.
       const result = await actions.actions.confirm({
         redirect: 'if_required',
-        returnUrl: cardData?.return_url ?? `${window.location.origin}/perfil/pagamentos?aba=pagamentos`,
       });
       if (result.type === 'error') throw new Error(result.error.message);
     } catch (confirmError) {
