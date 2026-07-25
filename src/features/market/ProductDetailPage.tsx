@@ -1,6 +1,6 @@
 import { BadgeCheck, ChevronRight, ExternalLink, Loader2, Store } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { productTypeMeta } from '@/lib/products';
 import { formatPrice } from '@/lib/format';
@@ -8,7 +8,7 @@ import { PageTopBar } from '@/components/layout/PageTopBar';
 import { PriceBadge } from '@/components/ui/PriceBadge';
 import { useTranslation } from '@/i18n/I18nProvider';
 import { useAuth } from '@/contexts/AuthContext';
-import { OfferingCheckoutError, useOfferingCheckout } from '@/features/payments/useOfferingCheckout';
+import { TransparentCheckoutSheet } from '@/features/payments/TransparentCheckoutSheet';
 import { useMarketProducts, useOfficialMarketStores, type MarketProduct } from './useMarket';
 
 function normalizeStoreKey(value: string | null | undefined): string {
@@ -27,14 +27,13 @@ function productStoreKeys(product: MarketProduct): string[] {
 
 export function ProductDetailPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session } = useAuth();
   const { productId = '' } = useParams<{ productId: string }>();
   const productsQuery = useMarketProducts();
   const officialStoresQuery = useOfficialMarketStores();
-  const checkout = useOfferingCheckout();
   const [notice, setNotice] = useState<string | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const product = productsQuery.data?.find((item) => item.id === productId) ?? null;
   const officialStoreKeySet = new Set(
     (officialStoresQuery.data ?? []).flatMap((store) =>
@@ -85,31 +84,15 @@ export function ProductDetailPage() {
   const canCheckout = Boolean(currentProduct.businessOfferingId && currentProduct.price > 0);
 
   function handleCheckout() {
-    if (!currentProduct.businessOfferingId || checkout.isPending) return;
+    if (!currentProduct.businessOfferingId) return;
     setNotice(null);
-    checkout.mutate(
-      { offeringId: currentProduct.businessOfferingId, billingType: 'one_time' },
-      {
-        onSuccess: () => {
-          setNotice('Compra criada. A confirmação do pagamento aparecerá em Pagamentos e em suas compras.');
-          void queryClient.invalidateQueries({ queryKey: ['purchased-products', session?.user.id] });
-          void queryClient.invalidateQueries({ queryKey: ['payment-transactions', session?.user.id] });
-        },
-        onError: (error) => {
-          const code = error instanceof OfferingCheckoutError ? error.code : '';
-          if (code === 'card_required' || code === 'payment_customer_required') {
-            setNotice('Cadastre um cartão principal para concluir a compra.');
-            navigate('/perfil/pagamentos?adicionarCartao=1');
-            return;
-          }
-          if (code === 'offering_content_unavailable') {
-            setNotice('Esta oferta ainda precisa finalizar a entrega antes de aceitar pagamento.');
-            return;
-          }
-          setNotice('Não foi possível iniciar a compra. Tente novamente.');
-        },
-      },
-    );
+    setCheckoutOpen(true);
+  }
+
+  function handleCheckoutConfirmed() {
+    setNotice('Pagamento confirmado. Seu acesso será atualizado automaticamente.');
+    void queryClient.invalidateQueries({ queryKey: ['purchased-products', session?.user.id] });
+    void queryClient.invalidateQueries({ queryKey: ['payment-transactions', session?.user.id] });
   }
 
   return (
@@ -180,7 +163,7 @@ export function ProductDetailPage() {
 
 	            <button
 	              type="button"
-	              disabled={!canCheckout || checkout.isPending}
+	              disabled={!canCheckout}
 	              onClick={handleCheckout}
 	              className={`flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full px-5 font-sans text-label ${
 	                canCheckout
@@ -188,19 +171,14 @@ export function ProductDetailPage() {
 	                  : 'bg-primary/35 text-on-surface-variant'
 	              }`}
 	            >
-	              {checkout.isPending ? (
-	                <>
-	                  <Loader2 size={18} className="animate-spin" aria-hidden />
-	                  Processando
-	                </>
-	              ) : canCheckout ? (
+	              {canCheckout ? (
 	                t('market.productDetail.buy').replace('{price}', formatPrice(product.price))
 	              ) : product.price > 0 ? (
 	                t('market.productDetail.checkoutSoon').replace('{price}', formatPrice(product.price))
 	              ) : (
 	                t('market.productDetail.accessSoon')
 	              )}
-	              {!checkout.isPending && <ChevronRight size={18} aria-hidden />}
+	              <ChevronRight size={18} aria-hidden />
 	            </button>
 
 	            {notice && (
@@ -221,6 +199,17 @@ export function ProductDetailPage() {
           </div>
         </section>
       </main>
+      {currentProduct.businessOfferingId ? (
+        <TransparentCheckoutSheet
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          offeringId={currentProduct.businessOfferingId}
+          billingType="one_time"
+          title={currentProduct.name}
+          amountLabel={formatPrice(currentProduct.price)}
+          onConfirmed={handleCheckoutConfirmed}
+        />
+      ) : null}
     </div>
   );
 }

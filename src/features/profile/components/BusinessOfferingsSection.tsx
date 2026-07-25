@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Loader2, Plus, ShoppingCart } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@/i18n/I18nProvider';
 import type { TranslationKey } from '@/i18n/translations';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -14,7 +15,7 @@ import {
   type OfferingType,
   type OfferingStatus,
 } from '../useBusinessOfferings';
-import { useOfferingCheckout } from '@/features/payments/useOfferingCheckout';
+import { TransparentCheckoutSheet } from '@/features/payments/TransparentCheckoutSheet';
 
 function mapOfferingError(error: unknown, t: (key: TranslationKey) => string): string {
   const message = error instanceof Error ? error.message : '';
@@ -46,12 +47,13 @@ export function BusinessOfferingsSection({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: types = [] } = useOfferingTypes();
   const { data: offerings = [], isLoading, isError } = useBusinessOfferings(businessId);
-  const checkout = useOfferingCheckout();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<OfferingType | null>(null);
+  const [checkoutOffering, setCheckoutOffering] = useState<BusinessOffering | null>(null);
 
   const typeBySlug = new Map(types.map((type) => [type.slug, type]));
 
@@ -123,8 +125,7 @@ export function BusinessOfferingsSection({
                     <button
                       type="button"
                       className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full bg-primary px-3 font-sans text-counter text-on-primary disabled:opacity-60"
-                      disabled={checkout.isPending}
-                      onClick={() => checkout.mutate({ offeringId: offering.id, billingType: offering.billing_type })}
+                      onClick={() => setCheckoutOffering(offering)}
                     >
                       <ShoppingCart size={14} aria-hidden />
                       {t('profile.business.offers.buy')}
@@ -169,8 +170,25 @@ export function BusinessOfferingsSection({
         onSelectType={setSelectedType}
         onClose={() => setCreateOpen(false)}
       />
+      {checkoutOffering ? (
+        <TransparentCheckoutSheet
+          open={Boolean(checkoutOffering)}
+          onClose={() => setCheckoutOffering(null)}
+          offeringId={checkoutOffering.id}
+          billingType={checkoutOffering.billing_type === 'recurring' ? 'recurring' : 'one_time'}
+          title={checkoutOffering.name}
+          amountLabel={formatOfferingPrice(checkoutOffering.price)}
+          onConfirmed={() => {
+            void queryClient.invalidateQueries({ queryKey: ['payment-transactions'] });
+          }}
+        />
+      ) : null}
     </section>
   );
+}
+
+function formatOfferingPrice(value: number | null | undefined): string {
+  return Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function CreateOfferingSheet({
