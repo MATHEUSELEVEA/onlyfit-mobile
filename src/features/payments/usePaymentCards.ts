@@ -48,13 +48,14 @@ function mapRow(row: {
   };
 }
 
-export function usePaymentCards() {
+export function usePaymentCards(options: { enabled?: boolean } = {}) {
   const { session } = useAuth();
   const userId = session?.user.id;
+  const enabled = options.enabled ?? true;
 
   return useQuery({
     queryKey: paymentCardsQueryKey(userId),
-    enabled: Boolean(userId),
+    enabled: enabled && Boolean(userId),
     queryFn: async (): Promise<PaymentCard[]> => {
       const { data, error } = await supabase
         .from('payment_cards')

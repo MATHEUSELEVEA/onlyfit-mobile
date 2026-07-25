@@ -39,6 +39,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCreatorFollowState, useToggleCreatorFollow } from './useCreatorFollow';
 import { useCreatorSubscription } from './useCreatorSubscription';
 import { TransparentCheckoutSheet } from '@/features/payments/TransparentCheckoutSheet';
+import { usePaymentPreload } from '@/features/payments/usePaymentPreload';
 import {
   useCreatorChallenges,
   useCreatorCommunities,
@@ -156,6 +157,7 @@ export function CreatorProfilePage() {
   const blockMutation = useBlockUser(creatorId);
   const unblockMutation = useUnblockUser(creatorId);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  usePaymentPreload(Boolean(!isOwnProfile && !subscribed && premiumOffering));
 
   function handleSubscribeClick() {
     if (subscribed) return;

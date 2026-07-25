@@ -9,6 +9,7 @@ import { PriceBadge } from '@/components/ui/PriceBadge';
 import { useTranslation } from '@/i18n/I18nProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { TransparentCheckoutSheet } from '@/features/payments/TransparentCheckoutSheet';
+import { usePaymentPreload } from '@/features/payments/usePaymentPreload';
 import { useMarketProducts, useOfficialMarketStores, type MarketProduct } from './useMarket';
 
 function normalizeStoreKey(value: string | null | undefined): string {
@@ -35,6 +36,8 @@ export function ProductDetailPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const product = productsQuery.data?.find((item) => item.id === productId) ?? null;
+  const canCheckout = Boolean(product?.businessOfferingId && product.price > 0);
+  usePaymentPreload(canCheckout);
   const officialStoreKeySet = new Set(
     (officialStoresQuery.data ?? []).flatMap((store) =>
       [store.organizationId, store.slug, store.name].map(normalizeStoreKey).filter(Boolean),
@@ -81,8 +84,6 @@ export function ProductDetailPage() {
 	  const sellerProfileTo = currentProduct.creatorUsername
 	    ? `/creator/${encodeURIComponent(currentProduct.creatorUsername)}`
 	    : null;
-  const canCheckout = Boolean(currentProduct.businessOfferingId && currentProduct.price > 0);
-
   function handleCheckout() {
     if (!currentProduct.businessOfferingId) return;
     setNotice(null);
