@@ -220,8 +220,8 @@ function CheckoutSheetBody({
       : t('payments.checkout.statusWaiting');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/45">
-      <section className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="fixed inset-0 z-[var(--z-sheet)] flex items-end bg-black/45">
+      <section className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-background p-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <header className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="font-sans text-title text-on-surface">{title}</h2>
@@ -249,6 +249,12 @@ function CheckoutSheetBody({
         ) : (
           <p className="mt-4 rounded-2xl bg-surface-container px-3 py-2 font-sans text-body-sm text-on-surface-variant">
             {t('payments.checkout.recurringCardOnly')}
+          </p>
+        )}
+
+        {error && (
+          <p role="alert" className="mt-4 rounded-2xl bg-error-container px-3 py-2 font-sans text-body-sm text-on-error-container">
+            {error}
           </p>
         )}
 
@@ -292,7 +298,6 @@ function CheckoutSheetBody({
           {statusLabel}
         </p>
         <p className="mt-2 font-sans text-counter text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
-        {error && <p role="alert" className="mt-3 rounded-2xl bg-error-container px-3 py-2 font-sans text-body-sm text-on-error-container">{error}</p>}
       </section>
     </div>
   );
