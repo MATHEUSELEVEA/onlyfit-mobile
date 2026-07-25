@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Copy, CreditCard, Loader2, QrCode, X } from 'lucide-react';
+import { Copy, CreditCard, Loader2, QrCode, X } from 'lucide-react';
 import type { StripeCheckoutElementsSdk, StripePaymentElement } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabase';
 import { loadOnlyFitStripe } from '@/lib/stripe';
@@ -30,7 +30,7 @@ interface TransparentCheckoutSheetProps {
 }
 
 const POLL_INTERVAL_MS = 3500;
-const CONFIRMED_CLOSE_DELAY_MS = 2200;
+const CONFIRMED_CLOSE_DELAY_MS = 120;
 
 function edgeType(billingType: BillingType): 'one_time' | 'subscription' {
   return billingType === 'recurring' ? 'subscription' : 'one_time';
@@ -250,43 +250,8 @@ function CheckoutSheetBody({
     }
   }
 
-  const statusLabel = confirmed
-    ? t('payments.checkout.confirmed')
-    : status === 'failed'
-      ? t('payments.checkout.statusFailed')
-      : t('payments.checkout.statusWaiting');
-
   if (confirmed) {
-    return (
-      <div className="fixed inset-0 z-[var(--z-sheet)] flex items-end bg-black/45">
-        <section className="w-full rounded-t-3xl bg-background px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-4">
-          <header className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 className="font-sans text-title text-on-surface">{title}</h2>
-              <p className="mt-1 font-sans text-body-sm text-on-surface-variant">{amountLabel}</p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t('payments.checkout.close')}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface"
-            >
-              <X size={18} aria-hidden />
-            </button>
-          </header>
-
-          <div className="mt-6 flex min-h-56 flex-col items-center justify-center text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <CheckCircle2 size={30} strokeWidth={1.8} aria-hidden />
-            </span>
-            <p className="mt-4 font-sans text-title text-on-surface">{t('payments.checkout.confirmed')}</p>
-            <p className="mt-1 max-w-64 font-sans text-body-sm text-on-surface-variant">
-              {t('payments.checkout.confirmedHint')}
-            </p>
-          </div>
-        </section>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -356,15 +321,18 @@ function CheckoutSheetBody({
           ) : (
             <div className="space-y-3">
               {cardSubmitted ? (
-                <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-outline-variant/30 bg-surface p-4 text-center">
+                <div className="flex min-h-28 items-center justify-center rounded-2xl border border-outline-variant/25 bg-surface-container-low">
                   <Loader2 size={24} className="animate-spin text-primary" aria-hidden />
-                  <p className="mt-3 font-sans text-label text-on-surface">{t('payments.checkout.statusWaiting')}</p>
-                  <p className="mt-1 font-sans text-body-sm text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
                 </div>
               ) : (
                 <>
                   <div ref={stripeMountRef} className="min-h-40 rounded-2xl border border-outline-variant/30 bg-surface p-3" />
-                  <button type="button" onClick={confirmCard} disabled={!cardData?.client_secret || confirmingCard || confirmed} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary disabled:opacity-60">
+                  <button
+                    type="button"
+                    onClick={confirmCard}
+                    disabled={!cardData?.client_secret || confirmingCard || confirmed}
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/45 bg-surface-container-high px-5 font-sans text-label text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_18px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98] disabled:opacity-60"
+                  >
                     {confirmingCard ? <Loader2 size={17} className="animate-spin" aria-hidden /> : <CreditCard size={17} aria-hidden />}
                     {t('payments.checkout.payCard')}
                   </button>
@@ -373,11 +341,6 @@ function CheckoutSheetBody({
             </div>
           )}
         </div>
-
-        <p className="mt-4 rounded-2xl bg-surface-container px-3 py-2 font-sans text-body-sm text-on-surface-variant" aria-live="polite">
-          {statusLabel}
-        </p>
-        <p className="mt-2 font-sans text-counter text-on-surface-variant">{t('payments.checkout.autoConfirm')}</p>
       </section>
     </div>
   );
