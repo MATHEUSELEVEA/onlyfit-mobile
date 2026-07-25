@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, CreditCard, Loader2, QrCode, X } from 'lucide-react';
-import { loadStripe, type StripeCheckoutElementsSdk, type StripePaymentElement } from '@stripe/stripe-js';
+import type { StripeCheckoutElementsSdk, StripePaymentElement } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabase';
+import { loadOnlyFitStripe } from '@/lib/stripe';
 import { useTranslation } from '@/i18n/I18nProvider';
 
 type BillingType = 'one_time' | 'recurring';
@@ -153,7 +154,7 @@ function CheckoutSheetBody({
     let element: StripePaymentElement | null = null;
     void (async () => {
       try {
-        const stripe = await loadStripe(publishableKey);
+        const stripe = await loadOnlyFitStripe(publishableKey);
         if (!stripe || cancelled || !stripeMountRef.current) return;
         // Pairs with ui_mode: 'elements' on the Checkout Session.
         const checkout = stripe.initCheckoutElementsSdk({ clientSecret });
