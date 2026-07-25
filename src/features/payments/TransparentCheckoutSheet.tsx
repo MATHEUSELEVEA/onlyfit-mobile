@@ -61,6 +61,16 @@ function statusFromCheckoutRow(row: { status: PaymentStatus | null; settlement_s
   return (row.settlement_status === 'settled' ? 'settled' : row.status) as PaymentStatus | null;
 }
 
+function destroyStripeElement(element: StripePaymentElement | null) {
+  if (!element) return;
+  try {
+    element.destroy();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes('already been destroyed')) throw error;
+  }
+}
+
 /**
  * Mounts the sheet body only while open, so all checkout state (intents, request
  * keys, Stripe element) is created and discarded with the sheet — no reset effect.
@@ -171,8 +181,10 @@ function CheckoutSheetBody({
     })();
     return () => {
       cancelled = true;
-      element?.destroy();
-      if (stripeElementRef.current === element) stripeElementRef.current = null;
+      if (stripeElementRef.current === element) {
+        destroyStripeElement(element);
+        stripeElementRef.current = null;
+      }
       checkoutRef.current = null;
     };
   }, [cardData, method, t]);
@@ -181,7 +193,7 @@ function CheckoutSheetBody({
 
   useEffect(() => {
     if (!confirmed) return undefined;
-    stripeElementRef.current?.destroy();
+    destroyStripeElement(stripeElementRef.current);
     stripeElementRef.current = null;
     checkoutRef.current = null;
     const timer = window.setTimeout(onClose, CONFIRMED_CLOSE_DELAY_MS);
