@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import {
-  loadStripe,
-  type Stripe,
-  type StripeElements,
-  type StripePaymentElement,
-} from '@stripe/stripe-js';
+import type { Stripe, StripeElements, StripePaymentElement } from '@stripe/stripe-js';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { TextField } from '@/components/ui/TextField';
 import { useTranslation } from '@/i18n/I18nProvider';
+import { loadOnlyFitStripe } from '@/lib/stripe';
 import { useSaveStripePaymentCard, useStartStripeCardSetup } from './usePaymentCards';
 
 interface AddCardSheetProps {
@@ -53,7 +49,7 @@ export function AddCardSheet({ open, onClose }: AddCardSheetProps) {
         if (cancelled || !mountRef.current) return;
         setupIntentIdRef.current = setup.setupIntentId;
 
-        const stripe = await loadStripe(setup.publishableKey);
+        const stripe = await loadOnlyFitStripe(setup.publishableKey);
         if (!stripe || cancelled || !mountRef.current) return;
         stripeRef.current = stripe;
 
