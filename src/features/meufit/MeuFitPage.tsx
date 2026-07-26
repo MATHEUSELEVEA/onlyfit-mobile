@@ -27,7 +27,7 @@ export function MeuFitPage() {
     {
       icon: Stethoscope,
       title: t('meufit.health.short'),
-      to: '/perfil/saude/novo?origem=meu-fit',
+      to: '/meu-fit/saude',
     },
   ];
 

@@ -2,17 +2,13 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
-  Dumbbell,
   Gavel,
-  Inbox,
   Loader2,
   LogOut,
   Palette,
   PencilLine,
   ReceiptText,
-  Salad,
   ShieldCheck,
-  Stethoscope,
   Target,
   UsersRound,
   WalletCards,
@@ -25,7 +21,6 @@ import { useTranslation } from '@/i18n/I18nProvider';
 import { PageTopBar } from '@/components/layout/PageTopBar';
 import { myProfileQueryKey, useMyProfile, type MyProfile } from './useMyProfile';
 import { IconChip, ProfileLink, SectionEyebrow } from './components/SettingsPrimitives';
-import { useUnreadCount } from '@/features/messages/useUnreadCount';
 
 // Central de Configurações em tela cheia, aberta pelo menu de barras do Perfil.
 export function SettingsMenuPage() {
@@ -38,7 +33,6 @@ export function SettingsMenuPage() {
   const userId = session?.user.id;
   const profileQueryKey = myProfileQueryKey(userId);
   const { data: profile } = useMyProfile();
-  const { data: unreadCount = 0 } = useUnreadCount();
   const isProfessional = profile?.isProfessional ?? false;
 
   const setProfessionalMutation = useMutation({
@@ -93,27 +87,6 @@ export function SettingsMenuPage() {
           <SectionEyebrow>{t('profile.section.navigation')}</SectionEyebrow>
 
           <div className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface shadow-sm">
-            <ProfileLink
-              icon={Stethoscope}
-              title={t('profile.settings.health')}
-              to="/perfil/saude"
-            />
-            <ProfileLink
-              icon={Dumbbell}
-              title={t('profile.settings.training')}
-              to="/meu-fit/treino"
-            />
-            <ProfileLink
-              icon={Salad}
-              title={t('profile.settings.diet')}
-              to="/meu-fit/dieta"
-            />
-            <ProfileLink
-              icon={Inbox}
-              title={t('profile.settings.messages')}
-              to="/mensagens"
-              badge={unreadCount}
-            />
             <ProfileLink
               icon={UsersRound}
               title={t('profile.settings.communities')}

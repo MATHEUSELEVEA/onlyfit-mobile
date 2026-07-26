@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Activity, AlertCircle, Bandage, Camera, FileCheck2, FileHeart, FileText, HeartPulse, Loader2, Mic, Moon, Paperclip, Pill, Plus, Square, Stethoscope, Syringe, Trash2 } from 'lucide-react';
+import { Activity, AlertCircle, Bandage, Camera, ChevronLeft, FileCheck2, FileHeart, FileText, HeartPulse, Loader2, Mic, Moon, Paperclip, Pill, Plus, Square, Stethoscope, Syringe, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { TextAreaField, TextField } from '@/components/ui/TextField';
@@ -14,21 +14,46 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const PROFILE_CONSENT = 'Autorizo o tratamento das informações que eu registrar para criar e manter minha Ficha de saúde no OnlyFit.';
 
 export function NewHealthRecordPage() {
+  return <HealthRecordFlow />;
+}
+
+/// Fluxo de registro (consentimento + wizard). Em `embedded` ele vive dentro da
+/// aba "Registro" de /meu-fit/saude, sem cabeçalho nem casca própria.
+export function HealthRecordFlow({ embedded = false, onSaved }: { embedded?: boolean; onSaved?: () => void }) {
   const [searchParams] = useSearchParams();
-  const correctsId = searchParams.get('corrige') ?? undefined;
+  const correctsId = embedded ? undefined : searchParams.get('corrige') ?? undefined;
   const { data: correctedEvent, isLoading, isError } = useHealthEvent(correctsId);
   const { data: consents = [], isLoading: consentsLoading, isError: consentsError, refetch: refetchConsents } = useHealthConsents();
   const hasProfileConsent = consents.find((consent) => consent.purpose === 'profile_storage')?.action === 'granted';
 
-  if (correctsId && isLoading) return <HealthPageShell width="form"><HealthPageHeader title="Corrigir informação" backTo={`/perfil/saude/eventos/${correctsId}`} /><main className="px-4 py-6"><LoadingRows /></main></HealthPageShell>;
-  if (correctsId && (isError || !correctedEvent)) return <HealthPageShell width="form"><HealthPageHeader title="Corrigir informação" backTo={`/perfil/saude/eventos/${correctsId}`} /><main className="px-4 py-6"><FeedbackMessage type="error">Não foi possível abrir a informação original.</FeedbackMessage></main></HealthPageShell>;
-  if (consentsLoading) return <HealthPageShell width="form"><HealthPageHeader title="Adicionar registro" backTo="/meu-fit" /><main className="px-4 py-6"><LoadingRows /></main></HealthPageShell>;
-  if (consentsError) return <HealthPageShell width="form"><HealthPageHeader title="Adicionar registro" backTo="/meu-fit" /><main className="px-4 py-6"><FeedbackMessage type="error">Não foi possível verificar a autorização da sua Ficha de saúde.</FeedbackMessage><button type="button" onClick={() => void refetchConsents()} className="mt-4 min-h-12 w-full rounded-xl bg-primary font-sans text-label text-on-primary">Tentar novamente</button></main></HealthPageShell>;
-  if (!hasProfileConsent) return <HealthRecordConsentGate />;
-  return <HealthRecordForm key={correctedEvent?.id ?? 'new'} correctsId={correctsId} correctedEvent={correctedEvent} />;
+  if (correctsId && isLoading) return <RecordShell embedded={embedded} title="Corrigir informação" backTo={`/perfil/saude/eventos/${correctsId}`}><LoadingRows /></RecordShell>;
+  if (correctsId && (isError || !correctedEvent)) return <RecordShell embedded={embedded} title="Corrigir informação" backTo={`/perfil/saude/eventos/${correctsId}`}><FeedbackMessage type="error">Não foi possível abrir a informação original.</FeedbackMessage></RecordShell>;
+  if (consentsLoading) return <RecordShell embedded={embedded} title="Adicionar registro" backTo="/meu-fit"><LoadingRows /></RecordShell>;
+  if (consentsError) return <RecordShell embedded={embedded} title="Adicionar registro" backTo="/meu-fit"><FeedbackMessage type="error">Não foi possível verificar a autorização da sua Ficha de saúde.</FeedbackMessage><button type="button" onClick={() => void refetchConsents()} className="mt-4 min-h-12 w-full rounded-xl bg-primary font-sans text-label text-on-primary">Tentar novamente</button></RecordShell>;
+  if (!hasProfileConsent) return <HealthRecordConsentGate embedded={embedded} />;
+  return <HealthRecordForm key={correctedEvent?.id ?? 'new'} correctsId={correctsId} correctedEvent={correctedEvent} embedded={embedded} onSaved={onSaved} />;
 }
 
-function HealthRecordConsentGate() {
+// Casca das telas do fluxo: página inteira na rota própria, apenas o conteúdo
+// quando o fluxo está embutido em uma aba.
+function RecordShell({ embedded, title, description, backTo, onBack, children }: {
+  embedded: boolean;
+  title: string;
+  description?: string;
+  backTo?: string;
+  onBack?: () => void;
+  children: ReactNode;
+}) {
+  if (embedded) return <div className="space-y-6 px-4 pb-8 pt-5">{children}</div>;
+  return (
+    <HealthPageShell width="form">
+      <HealthPageHeader title={title} description={description} backTo={backTo} onBack={onBack} />
+      <main className="space-y-6 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6">{children}</main>
+    </HealthPageShell>
+  );
+}
+
+function HealthRecordConsentGate({ embedded }: { embedded: boolean }) {
   const navigate = useNavigate();
   const recordConsent = useRecordHealthConsent();
   const [checked, setChecked] = useState(false);
@@ -47,21 +72,18 @@ function HealthRecordConsentGate() {
     }
   }
 
-  return <HealthPageShell width="form">
-    <HealthPageHeader title="Antes de registrar" description="Sua Ficha de saúde é privada" onBack={() => navigate('/meu-fit')} />
-    <main className="space-y-5 px-4 py-6">
-      <p className="font-sans text-body text-on-surface-variant">Para salvar check-ins, sintomas e demais registros, precisamos da sua autorização para manter esses dados na sua Ficha de saúde.</p>
-      <label className="flex items-start gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container p-4">
-        <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-primary" />
-        <span className="font-sans text-body text-on-surface">{PROFILE_CONSENT}</span>
-      </label>
-      {error ? <FeedbackMessage type="error">{error}</FeedbackMessage> : null}
-      <button type="button" onClick={() => void authorize()} disabled={recordConsent.isPending} className="min-h-12 w-full rounded-xl bg-primary font-sans text-label text-on-primary disabled:opacity-60">{recordConsent.isPending ? 'Salvando autorização...' : 'Continuar para o registro'}</button>
-    </main>
-  </HealthPageShell>;
+  return <RecordShell embedded={embedded} title="Antes de registrar" description="Sua Ficha de saúde é privada" onBack={() => navigate('/meu-fit')}>
+    <p className="font-sans text-body text-on-surface-variant">Para salvar check-ins, sintomas e demais registros, precisamos da sua autorização para manter esses dados na sua Ficha de saúde.</p>
+    <label className="flex items-start gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container p-4">
+      <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-primary" />
+      <span className="font-sans text-body text-on-surface">{PROFILE_CONSENT}</span>
+    </label>
+    {error ? <FeedbackMessage type="error">{error}</FeedbackMessage> : null}
+    <button type="button" onClick={() => void authorize()} disabled={recordConsent.isPending} className="min-h-12 w-full rounded-xl bg-primary font-sans text-label text-on-primary disabled:opacity-60">{recordConsent.isPending ? 'Salvando autorização...' : 'Continuar para o registro'}</button>
+  </RecordShell>;
 }
 
-function HealthRecordForm({ correctsId, correctedEvent }: { correctsId?: string; correctedEvent?: HealthEvent }) {
+function HealthRecordForm({ correctsId, correctedEvent, embedded, onSaved }: { correctsId?: string; correctedEvent?: HealthEvent; embedded: boolean; onSaved?: () => void }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const appendEvent = useAppendHealthEvent();
@@ -88,7 +110,7 @@ function HealthRecordForm({ correctsId, correctedEvent }: { correctsId?: string;
   const [sleepQuality, setSleepQuality] = useState(3);
   const [hungerScore, setHungerScore] = useState(5);
   const [energyScore, setEnergyScore] = useState(3);
-  const openedFromMyFit = searchParams.get('origem') === 'meu-fit' && !correctsId;
+  const openedFromMyFit = !embedded && searchParams.get('origem') === 'meu-fit' && !correctsId;
   const isHabit = category === 'habit';
 
   // A foto nunca sai do dispositivo depois da leitura: a prévia é um object URL
@@ -225,7 +247,9 @@ function HealthRecordForm({ correctsId, correctedEvent }: { correctsId?: string;
         provenance: { submitted_via: 'onlyfit-mobile', input_mode: captureMethod, ai_used: isHabit ? false : usedAi, user_reviewed: true },
         facts: isHabit ? habitFacts({ sleepHours, sleepQuality, hungerScore, energyScore, effectiveDate }) : usesExtractedFacts ? extractedFacts : [],
       });
-      if (openedFromMyFit) {
+      if (embedded) {
+        onSaved?.();
+      } else if (openedFromMyFit) {
         setShowMyFitSuccess(true);
       } else {
         navigate('/perfil/saude', { replace: true, state: { success: correctsId ? 'Correção adicionada ao histórico.' : 'Registro adicionado ao histórico.' } });
@@ -239,14 +263,24 @@ function HealthRecordForm({ correctsId, correctedEvent }: { correctsId?: string;
   }
 
   return (
-    <HealthPageShell width="form">
-      <HealthPageHeader
+    <>
+      <RecordShell
+        embedded={embedded}
         title={correctsId ? 'Corrigir informação' : 'Adicionar registro'}
         description={correctsId ? 'A informação anterior continuará no histórico' : 'Você revisa tudo antes de salvar'}
         backTo={correctsId ? `/perfil/saude/eventos/${correctsId}` : openedFromMyFit ? '/meu-fit' : '/perfil/saude'}
         onBack={!correctsId && step > 1 ? () => setStep((current) => current - 1) : undefined}
-      />
-      <main className="space-y-6 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6">
+      >
+        {embedded && step > 1 ? (
+          <button
+            type="button"
+            onClick={() => setStep(1)}
+            className="inline-flex min-h-11 items-center gap-1 font-sans text-label text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ChevronLeft size={17} aria-hidden />
+            {category ? `${healthCategoryLabels[category]} · trocar tipo` : 'Trocar tipo'}
+          </button>
+        ) : null}
         {step === 1 ? <RecordTypeStep category={category} onSelect={(value) => { setCategory(value); setError(''); setStep(2); }} /> : null}
         {step === 2 && isHabit ? (
           <section className="space-y-5">
@@ -296,7 +330,7 @@ function HealthRecordForm({ correctsId, correctedEvent }: { correctsId?: string;
 
         {error ? <FeedbackMessage type="error">{error}</FeedbackMessage> : null}
         {step === 2 ? <WizardAction disabled={appendEvent.isPending || captureBusy || recorder.isRecording} onClick={() => void saveRecord()}>{appendEvent.isPending ? 'Salvando...' : correctsId ? 'Adicionar correção' : 'Salvar registro'}</WizardAction> : null}
-      </main>
+      </RecordShell>
       <BottomSheet
         open={showMyFitSuccess}
         onClose={() => navigate('/meu-fit', { replace: true })}
@@ -313,7 +347,7 @@ function HealthRecordForm({ correctsId, correctedEvent }: { correctsId?: string;
           </button>
         </div>
       </BottomSheet>
-    </HealthPageShell>
+    </>
   );
 }
 
