@@ -9,6 +9,7 @@ Arquivo padrão para agentes de IA (Cursor, GitHub Copilot, OpenAI Codex, Windsu
 ## Leia o CLAUDE.md
 
 O documento canônico deste repositório é **[`CLAUDE.md`](./CLAUDE.md)**. Ele vale para **qualquer** modelo ou ferramenta, não só o Claude. Leia-o inteiro antes de sugerir ou escrever código.
+Leia também **[`SECURITY-SCALABILITY.md`](./SECURITY-SCALABILITY.md)** antes de qualquer mudança.
 
 As regras invioláveis, a stack, como rodar e a estrutura de pastas estão lá. O detalhamento por tema está em [`docs/`](./docs/DOCUMENTATION-INDEX.md).
 
