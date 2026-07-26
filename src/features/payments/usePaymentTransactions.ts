@@ -13,6 +13,11 @@ export type PaymentTransaction = {
   settlement_status: string;
   created_at: string;
   credit_date: string | null;
+  payment_method: string | null;
+  card_brand: string | null;
+  card_last4: string | null;
+  offering_name: string | null;
+  professional_name: string | null;
 };
 
 export function usePaymentTransactions() {

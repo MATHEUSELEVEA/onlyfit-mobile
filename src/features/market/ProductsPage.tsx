@@ -1,7 +1,15 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { BadgeCheck, Check, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  BadgeCheck,
+  Check,
+  ChevronRight,
+  Loader2,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 import { clsx } from 'clsx';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAffinityGroups } from '@/lib/sports';
 import { MARKET_CATEGORIES, productCategory } from '@/lib/products';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -14,6 +22,12 @@ import nikeMarkUrl from '@/assets/official-stores/marks/nike.svg?url';
 import { ProductCard } from './ProductCard';
 import { PurchasedProducts } from './PurchasedProducts';
 import {
+  isSponsoredMarketProduct,
+  marketProductStoreKeys,
+  officialMarketStoreKeys,
+  promotedMarketProducts,
+} from './marketMerchandising';
+import {
   useMarketProducts,
   useOfficialMarketStores,
   type MarketProduct,
@@ -21,30 +35,6 @@ import {
 } from './useMarket';
 
 type MarketTab = 'mercado' | 'compras';
-
-function isFeatured(index: number): boolean {
-  return index % 6 === 0;
-}
-
-function normalizeStoreKey(value: string | null | undefined): string {
-  return (value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
-}
-
-function productStoreKeys(product: MarketProduct): string[] {
-  return [product.organizationId, product.storeSlug, product.storeName, product.creatorName]
-    .map(normalizeStoreKey)
-    .filter(Boolean);
-}
-
-function officialStoreKeys(store: OfficialMarketStore): string[] {
-  return [store.organizationId, store.slug, store.name]
-    .map(normalizeStoreKey)
-    .filter(Boolean);
-}
 
 const OFFICIAL_STORE_MARKS: Record<string, string> = {
   'natu-vida': natuVidaMarkUrl,
@@ -84,7 +74,7 @@ function filterProducts(
     if (sport && !product.sports.includes(sport)) return false;
     if (freeOnly && product.price > 0) return false;
     if (officialOnly && !isOfficialProduct(product)) return false;
-    if (officialOnly && selectedOfficialStoreKey && !productStoreKeys(product).includes(selectedOfficialStoreKey)) return false;
+    if (officialOnly && selectedOfficialStoreKey && !marketProductStoreKeys(product).includes(selectedOfficialStoreKey)) return false;
     if (term) {
       const haystack = `${product.name} ${product.description ?? ''} ${product.storeName} ${product.creatorName}`.toLowerCase();
       if (!haystack.includes(term)) return false;
@@ -118,20 +108,13 @@ export function ProductsPage() {
   const products = useMemo((): MarketProduct[] => productsQuery.data ?? [], [productsQuery.data]);
   const officialStores = useMemo((): OfficialMarketStore[] => officialStoresQuery.data ?? [], [officialStoresQuery.data]);
 
-  const officialStoreOrgIds = useMemo(
-    () => new Set(officialStores.map((store) => store.organizationId).filter((id): id is string => Boolean(id))),
-    [officialStores],
-  );
-  const officialStoreKeySet = useMemo(
-    () => new Set(officialStores.flatMap(officialStoreKeys)),
-    [officialStores],
-  );
   const isOfficialProduct = useMemo(
-    () => (product: MarketProduct) => {
-      if (product.organizationId && officialStoreOrgIds.has(product.organizationId)) return true;
-      return productStoreKeys(product).some((key) => officialStoreKeySet.has(key));
-    },
-    [officialStoreOrgIds, officialStoreKeySet],
+    () => (product: MarketProduct) => isSponsoredMarketProduct(product, officialStores),
+    [officialStores],
+  );
+  const promoted = useMemo(
+    () => promotedMarketProducts(products, officialStores),
+    [products, officialStores],
   );
 
   const term = search.trim().toLowerCase();
@@ -150,7 +133,7 @@ export function ProductsPage() {
   const hasActiveFilters = category !== null || sport !== null || freeOnly || officialOnly;
   const selectedOfficialStore = useMemo(() => {
     if (!selectedOfficialStoreKey) return null;
-    return officialStores.find((store) => officialStoreKeys(store).includes(selectedOfficialStoreKey)) ?? null;
+    return officialStores.find((store) => officialMarketStoreKeys(store).includes(selectedOfficialStoreKey)) ?? null;
   }, [officialStores, selectedOfficialStoreKey]);
   const selectedSportLabel = sport ? groups.find((group) => group.key === sport)?.label ?? sport : null;
 
@@ -186,17 +169,6 @@ export function ProductsPage() {
 
         {tab === 'mercado' && (
           <>
-            <OfficialStoresRail
-              stores={officialStores}
-              loading={officialStoresQuery.isLoading && officialStores.length === 0}
-              activeStoreKey={selectedOfficialStoreKey}
-              onSelect={(store) => {
-                setOfficialOnly(true);
-                setSelectedOfficialStoreKey(officialStoreKeys(store)[0] ?? null);
-                setSearch('');
-              }}
-            />
-
             <div className="px-4 pt-4">
               <div className="relative flex items-center gap-2">
                 <div className="relative min-w-0 flex-1">
@@ -230,6 +202,83 @@ export function ProductsPage() {
                 </button>
               </div>
             </div>
+
+            <SponsorCarousel
+              stores={officialStores}
+              loading={officialStoresQuery.isLoading && officialStores.length === 0}
+              activeStoreKey={selectedOfficialStoreKey}
+              onSelect={(store) => {
+                setOfficialOnly(true);
+                setSelectedOfficialStoreKey(officialMarketStoreKeys(store)[0] ?? null);
+                setSearch('');
+              }}
+            />
+
+            {!isLoading && promoted.length > 0 && (
+              <section className="mt-5" aria-labelledby="market-featured-title">
+                <div className="flex items-end justify-between gap-3 px-4">
+                  <div>
+                    <h2 id="market-featured-title" className="font-sans text-title text-on-surface">
+                      {t('market.featured.title')}
+                    </h2>
+                    <p className="font-sans text-body-sm text-on-surface-variant">
+                      {t('market.featured.subtitle')}
+                    </p>
+                  </div>
+                  <Link
+                    to="/produtos/destaques"
+                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 font-sans text-label text-primary"
+                  >
+                    {t('market.featured.more')}
+                    <ChevronRight size={16} aria-hidden />
+                  </Link>
+                </div>
+                <div className="mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {promoted.map((product) => (
+                    <div key={product.id} className="w-44 shrink-0 snap-start">
+                      <ProductCard product={product} promoted />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="mt-5" aria-labelledby="market-categories-title">
+              <h2 id="market-categories-title" className="px-4 font-sans text-title text-on-surface">
+                {t('market.categories')}
+              </h2>
+              <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button
+                  type="button"
+                  aria-pressed={category === null}
+                  onClick={() => setCategory(null)}
+                  className={clsx(
+                    'min-h-[40px] shrink-0 rounded-full px-4 font-sans text-label transition-colors',
+                    category === null
+                      ? 'bg-primary text-on-primary'
+                      : 'bg-surface-container text-on-surface-variant',
+                  )}
+                >
+                  {t('common.all')}
+                </button>
+                {MARKET_CATEGORIES.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={category === key}
+                    onClick={() => setCategory(category === key ? null : key)}
+                    className={clsx(
+                      'min-h-[40px] shrink-0 rounded-full px-4 font-sans text-label transition-colors',
+                      category === key
+                        ? 'bg-primary text-on-primary'
+                        : 'bg-surface-container text-on-surface-variant',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </section>
 
             {hasActiveFilters && (
               <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -302,16 +351,20 @@ export function ProductsPage() {
             )}
 
             {!isLoading && !isError && visible.length > 0 && (
-              <div className="mt-2 grid grid-cols-2 gap-3 px-4">
-                {visible.map((product, index) => (
+              <>
+                <h2 className="mt-5 px-4 font-sans text-title text-on-surface">
+                  {t('market.products')}
+                </h2>
+                <div className="mt-3 grid grid-cols-2 gap-3 px-4">
+                {visible.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
-                    featured={isFeatured(index)}
                     isOfficialStore={isOfficialProduct(product)}
                   />
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </>
         )}
@@ -415,7 +468,7 @@ export function ProductsPage() {
   );
 }
 
-function OfficialStoresRail({
+function SponsorCarousel({
   stores,
   loading,
   activeStoreKey,
@@ -427,63 +480,168 @@ function OfficialStoresRail({
   onSelect: (store: OfficialMarketStore) => void;
 }) {
   const { t } = useTranslation();
+  const trackRef = useRef<HTMLDivElement>(null);
+  const pressStartedAtRef = useRef(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused || stores.length < 2) return;
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (media.matches) return;
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => {
+        const next = (current + 1) % stores.length;
+        const track = trackRef.current;
+        const target = track?.children.item(next) as HTMLElement | null;
+        if (track && target) {
+          track.scrollTo({
+            left: target.offsetLeft - track.offsetLeft,
+            behavior: 'smooth',
+          });
+        }
+        return next;
+      });
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [paused, stores.length]);
+
   if (!loading && stores.length === 0) return null;
 
   return (
-    <section className="mx-4 mt-4 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-4" aria-labelledby="official-stores-title">
-      <div className="mb-3.5 flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary" aria-hidden>
-          <BadgeCheck size={16} />
-        </span>
-        <div className="min-w-0">
-          <h2 id="official-stores-title" className="font-sans text-title leading-tight text-on-surface">{t('market.officialStores')}</h2>
-          <p className="font-sans text-body-sm text-on-surface-variant">{t('market.officialStoresSubtitle')}</p>
-        </div>
+    <section className="mt-5" aria-labelledby="market-sponsors-title">
+      <div className="flex items-end justify-between gap-3 px-4">
+        <h2 id="market-sponsors-title" className="font-sans text-title text-on-surface">
+          {t('market.sponsors')}
+        </h2>
+        <p className="font-sans text-counter font-normal text-on-surface-variant">
+          {t('market.sponsors.hint')}
+        </p>
       </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        {loading
-          ? Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="aspect-square min-w-0 animate-pulse rounded-2xl bg-surface-container" aria-hidden />
-            ))
-          : stores.map((store) => {
-              const active = activeStoreKey ? officialStoreKeys(store).includes(activeStoreKey) : false;
-              const markUrl = officialStoreMarkUrl(store);
+      {loading ? (
+        <div className="mx-4 mt-3 aspect-[16/6] animate-pulse rounded-2xl bg-surface-container" aria-hidden />
+      ) : (
+        <>
+          <div
+            ref={trackRef}
+            onPointerDown={() => {
+              pressStartedAtRef.current = Date.now();
+              setPaused(true);
+            }}
+            onPointerUp={() => setPaused(false)}
+            onPointerCancel={() => setPaused(false)}
+            onPointerLeave={() => setPaused(false)}
+            onScroll={(event) => {
+              const track = event.currentTarget;
+              const targetLeft = track.scrollLeft + track.offsetLeft;
+              const nearest = Array.from(track.children).reduce(
+                (best, child, index) => {
+                  const distance = Math.abs((child as HTMLElement).offsetLeft - targetLeft);
+                  return distance < best.distance ? { index, distance } : best;
+                },
+                { index: 0, distance: Number.POSITIVE_INFINITY },
+              );
+              setActiveIndex(nearest.index);
+            }}
+            className="mt-3 flex snap-x snap-mandatory overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {stores.map((store) => {
+              const active = activeStoreKey
+                ? officialMarketStoreKeys(store).includes(activeStoreKey)
+                : false;
+              const markUrl = officialStoreMarkUrl(store) || store.logoUrl;
               return (
                 <button
                   key={store.id}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => onSelect(store)}
+                  onClick={(event) => {
+                    if (
+                      event.detail === 0 ||
+                      Date.now() - pressStartedAtRef.current < 450
+                    ) {
+                      onSelect(store);
+                    }
+                  }}
                   className={clsx(
-                    'flex min-w-0 flex-col overflow-hidden rounded-2xl border p-2.5 text-center transition-colors duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                    active ? 'border-primary bg-primary/[0.06]' : 'border-outline-variant/25 bg-surface-container',
+                    'relative aspect-[16/6] w-full shrink-0 snap-center overflow-hidden rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                    active && 'ring-2 ring-primary',
                   )}
                 >
-                  <div className="relative flex aspect-square w-full items-center justify-center rounded-xl bg-white p-4 ring-1 ring-black/[0.04]">
-                    {(markUrl || store.logoUrl) ? (
-                      <img
-                        src={markUrl || store.logoUrl || undefined}
-                        alt={store.name}
-                        className="max-h-full max-w-full object-contain object-center"
-                        loading="lazy"
-                      />
-                    ) : (
-                      // Fallback: iniciais sobre o painel branco fixo (cor concreta escura, como texto sobre mídia).
-                      <span className="font-sans text-display text-zinc-800">{store.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('')}</span>
+                  {store.coverImageUrl && (
+                    <img
+                      src={store.coverImageUrl}
+                      alt=""
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
+                  <span
+                    aria-hidden
+                    className={clsx(
+                      'absolute inset-0',
+                      store.coverImageUrl
+                        ? 'bg-inverse-surface/80'
+                        : 'bg-surface-container-high',
                     )}
-                    <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-on-primary" aria-label={t('market.official')}>
-                      <BadgeCheck size={12} aria-hidden />
+                  />
+                  <span className="relative flex h-full items-center gap-4 p-4">
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-container-lowest p-2">
+                      {markUrl ? (
+                        <img
+                          src={markUrl}
+                          alt={store.name}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <span className="font-sans text-title text-on-surface">
+                          {store.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('')}
+                        </span>
+                      )}
                     </span>
-                  </div>
-                  <div className="mt-2 min-w-0 px-0.5 pb-0.5">
-                    <p className="truncate font-sans text-label text-on-surface">{store.name}</p>
-                    <p className="mt-0.5 truncate font-sans text-counter text-on-surface-variant">{store.category || t('market.sponsorBrand')}</p>
-                  </div>
+                    <span className={clsx('min-w-0', store.coverImageUrl && 'text-inverse-on-surface')}>
+                      <span className="inline-flex items-center gap-1 font-sans text-counter">
+                        <BadgeCheck size={13} aria-hidden />
+                        {t('market.sponsorBrand')}
+                      </span>
+                      <span className="mt-1 block truncate font-sans text-title">
+                        {store.name}
+                      </span>
+                      <span
+                        className={clsx(
+                          'mt-0.5 block truncate font-sans text-body-sm',
+                          store.coverImageUrl
+                            ? 'text-inverse-on-surface/80'
+                            : 'text-on-surface-variant',
+                        )}
+                      >
+                        {store.tagline || store.category || t('market.officialStoresSubtitle')}
+                      </span>
+                    </span>
+                  </span>
                 </button>
               );
             })}
-      </div>
+          </div>
+          {stores.length > 1 && (
+            <div className="mt-2 flex justify-center gap-1.5" aria-hidden>
+              {stores.map((store, index) => (
+                <span
+                  key={store.id}
+                  className={clsx(
+                    'h-1.5 rounded-full transition-[width,background-color] duration-200 motion-reduce:transition-none',
+                    index === activeIndex
+                      ? 'w-5 bg-primary'
+                      : 'w-1.5 bg-outline-variant',
+                  )}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </section>
   );
 }

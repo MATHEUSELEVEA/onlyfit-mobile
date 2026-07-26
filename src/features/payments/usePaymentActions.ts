@@ -23,6 +23,7 @@ export function useCancelSubscription() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['payment-transactions'] });
+      void queryClient.invalidateQueries({ queryKey: ['payment-subscriptions'] });
     },
   });
 }

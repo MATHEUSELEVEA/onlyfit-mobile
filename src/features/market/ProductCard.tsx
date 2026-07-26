@@ -9,12 +9,20 @@ interface ProductCardProps {
   product: MarketProduct;
   /** Card em destaque: ocupa 2 colunas, com imagem grande e texto sobreposto. */
   featured?: boolean;
+  /** Card compacto usado na faixa horizontal de mídia patrocinada. */
+  promoted?: boolean;
   /** Vitrine de Meus produtos: esconde preço/CTA textual e reduz ruído. */
   owned?: boolean;
   isOfficialStore?: boolean;
 }
 
-export function ProductCard({ product, featured = false, owned = false, isOfficialStore = false }: ProductCardProps) {
+export function ProductCard({
+  product,
+  featured = false,
+  promoted = false,
+  owned = false,
+  isOfficialStore = false,
+}: ProductCardProps) {
   const { t } = useTranslation();
   const meta = productTypeMeta(product.type, product.marketItemType);
   const Icon = meta.icon;
@@ -27,6 +35,46 @@ export function ProductCard({ product, featured = false, owned = false, isOffici
       {meta.label}
     </span>
   );
+
+  if (promoted) {
+    return (
+      <Link
+        to={to}
+        className="group flex h-full flex-col overflow-hidden rounded-2xl bg-surface-container-lowest transition-colors active:bg-surface-container"
+        aria-label={product.name}
+      >
+        <div className="relative aspect-square w-full overflow-hidden bg-surface-container-high">
+          {image ? (
+            <img
+              src={image}
+              alt={product.name}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-300 group-active:scale-105 motion-reduce:transition-none"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-on-surface-variant">
+              <Icon size={30} aria-hidden />
+            </div>
+          )}
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-inverse-surface/80 px-2 py-1 font-sans text-counter text-inverse-on-surface backdrop-blur-sm">
+            <BadgeCheck size={12} aria-hidden />
+            {t('market.featured.sponsored')}
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col p-3">
+          <p className="line-clamp-2 font-sans text-body font-semibold text-on-surface">
+            {product.name}
+          </p>
+          <p className="mt-1 truncate font-sans text-counter font-normal text-on-surface-variant">
+            {product.storeName}
+          </p>
+          <div className="mt-auto pt-2">
+            <PriceBadge price={product.price} owned={owned} />
+          </div>
+        </div>
+      </Link>
+    );
+  }
 
   // Variante em destaque: imagem cheia com texto sobreposto (padrão do Explorar).
   if (featured) {
