@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, ChevronRight, Heart, Loader2, MessageCircle, Radio, UsersRound } from 'lucide-react';
+import { Bell, CheckCheck, ChevronRight, Heart, Loader2, MessageCircle, Radio, ThumbsDown, UsersRound } from 'lucide-react';
 import { clsx } from 'clsx';
 import { BackButton } from '@/components/ui/BackButton';
 import {
@@ -10,7 +10,8 @@ import {
 } from './useNotifications';
 
 function iconFor(type: string) {
-  if (type === 'post_like') return Heart;
+  if (type === 'post_like' || type === 'comment_like') return Heart;
+  if (type === 'comment_dislike') return ThumbsDown;
   if (type === 'community_comment') return UsersRound;
   if (type === 'post_comment' || type === 'post_reply') return MessageCircle;
   return Radio;
