@@ -151,6 +151,7 @@ export function CreatorProfilePage() {
   const { data: following = false } = useCreatorFollowState(creatorId);
   const { data: subscribed = false } = useCreatorSubscription(creatorId);
   const { data: premiumOffering = null } = useCreatorPremiumOffering(creatorId);
+  const { data: creatorProducts = [] } = useCreatorProducts(creatorId);
   const { data: isBlocked = false, isLoading: isBlockStateLoading } = useUserBlockState(creatorId);
   const { data: hasBlockedTarget = false } = useOwnUserBlockState(creatorId);
   const toggleFollow = useToggleCreatorFollow(creatorId);
@@ -165,10 +166,6 @@ export function CreatorProfilePage() {
       setSubscribeNotice('Você não pode assinar o próprio perfil.');
       return;
     }
-    if (!premiumOffering) {
-      setSubscribeNotice('Este criador ainda não publicou uma assinatura premium.');
-      return;
-    }
     setSubscribeNotice(null);
     setCheckoutOpen(true);
   }
@@ -178,6 +175,18 @@ export function CreatorProfilePage() {
     void queryClient.invalidateQueries({ queryKey: ['creator-subscription', creatorId, session?.user.id] });
     void queryClient.invalidateQueries({ queryKey: ['payment-transactions', session?.user.id] });
   }
+
+  // Só mostramos abas que têm o que exibir: sem oferta premium ativa não há
+  // assinatura, e sem produtos publicados não há vitrine. Sem a aba de conteúdo
+  // exclusivo a distinção "gratuito × pago" some, então a aba vira só "Feed".
+  const visibleTabs = TABS.filter((item) => {
+    if (item.key === 'exclusive') return Boolean(premiumOffering);
+    if (item.key === 'products') return creatorProducts.length > 0;
+    return true;
+  }).map((item) =>
+    item.key === 'free' && !premiumOffering ? { ...item, label: 'Feed' } : item,
+  );
+  const activeTab = visibleTabs.some((item) => item.key === tab) ? tab : 'free';
 
   const subPrice = premiumOffering?.price ?? creator.subscriptionPrice;
   const shareUrl = publicAppUrl(`/creator/${encodeURIComponent(creator.username)}`);
@@ -296,41 +305,47 @@ export function CreatorProfilePage() {
             <span className="font-sans text-title text-on-surface">{formatCount(creator.followerCount)}</span>
             <span className="font-sans text-eyebrow uppercase text-on-surface-variant">Seguidores</span>
           </button>
-          <div className="w-px bg-outline-variant/40" aria-hidden />
-          <div className="flex flex-1 flex-col items-center">
-            <span className="font-sans text-title text-on-surface">{formatCount(creator.subscriberCount)}</span>
-            <span className="font-sans text-eyebrow uppercase text-on-surface-variant">Assinantes</span>
-          </div>
+          {premiumOffering && (
+            <>
+              <div className="w-px bg-outline-variant/40" aria-hidden />
+              <div className="flex flex-1 flex-col items-center">
+                <span className="font-sans text-title text-on-surface">{formatCount(creator.subscriberCount)}</span>
+                <span className="font-sans text-eyebrow uppercase text-on-surface-variant">Assinantes</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Ações */}
         <div className="mt-4 flex w-full max-w-xs gap-2">
-          <button
-            type="button"
-            onClick={handleSubscribeClick}
-            aria-pressed={subscribed}
-            disabled={isOwnProfile}
-            className={clsx(
-              'inline-flex min-h-[44px] flex-1 items-center justify-center rounded-full font-sans text-label transition-all active:scale-[0.98] disabled:opacity-60',
-              subscribed
-                ? 'border border-outline-variant/60 bg-surface-container-low text-on-surface'
-                : 'border border-primary/50 bg-surface-container-high text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_18px_rgba(0,0,0,0.18)]',
-            )}
-          >
-            {subscribed ? (
-              <>
-                <Check size={15} strokeWidth={3} aria-hidden /> Assinado
-              </>
-            ) : subPrice > 0 ? (
-              <span className="inline-flex items-center justify-center gap-2 px-3">
-                <span>Assinar</span>
-                <span className="h-3 w-px bg-primary/35" aria-hidden />
-                <span className="font-sans text-counter tabular-nums text-primary">{formatPrice(subPrice)}</span>
-              </span>
-            ) : (
-              'Assinar'
-            )}
-          </button>
+          {premiumOffering && (
+            <button
+              type="button"
+              onClick={handleSubscribeClick}
+              aria-pressed={subscribed}
+              disabled={isOwnProfile}
+              className={clsx(
+                'inline-flex min-h-[44px] flex-1 items-center justify-center rounded-full font-sans text-label transition-all active:scale-[0.98] disabled:opacity-60',
+                subscribed
+                  ? 'border border-outline-variant/60 bg-surface-container-low text-on-surface'
+                  : 'border border-primary/50 bg-surface-container-high text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_18px_rgba(0,0,0,0.18)]',
+              )}
+            >
+              {subscribed ? (
+                <>
+                  <Check size={15} strokeWidth={3} aria-hidden /> Assinado
+                </>
+              ) : subPrice > 0 ? (
+                <span className="inline-flex items-center justify-center gap-2 px-3">
+                  <span>Assinar</span>
+                  <span className="h-3 w-px bg-primary/35" aria-hidden />
+                  <span className="font-sans text-counter tabular-nums text-primary">{formatPrice(subPrice)}</span>
+                </span>
+              ) : (
+                'Assinar'
+              )}
+            </button>
+          )}
           {!isOwnProfile && (
             <button
               type="button"
@@ -373,15 +388,15 @@ export function CreatorProfilePage() {
       {/* Abas */}
       <div className="sticky top-0 z-20 mt-6 border-b border-outline-variant/40 bg-background/95 backdrop-blur-md">
         <div className="no-scrollbar flex gap-1 overflow-x-auto px-3">
-          {TABS.map(({ key, label, icon: Icon }) => (
+          {visibleTabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              aria-pressed={tab === key}
+              aria-pressed={activeTab === key}
               className={clsx(
                 'flex min-h-[46px] shrink-0 items-center gap-1.5 border-b-2 px-3 font-sans text-label transition-colors',
-                tab === key
+                activeTab === key
                   ? 'border-primary text-primary'
                   : 'border-transparent text-on-surface-variant',
               )}
@@ -395,7 +410,7 @@ export function CreatorProfilePage() {
 
       <div className="px-4 pt-5">
         <TabPanel
-          tab={tab}
+          tab={activeTab}
           creatorId={creatorId}
           creatorUsername={creator.username}
           subscribed={subscribed}
