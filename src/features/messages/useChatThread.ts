@@ -41,9 +41,10 @@ export function useChatMessages(peerId: string | undefined) {
         .or(
           `and(sender_id.eq.${userId},receiver_id.eq.${peerId}),and(sender_id.eq.${peerId},receiver_id.eq.${userId})`,
         )
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(200);
       if (error) throw error;
-      return (data ?? []) as ChatMessage[];
+      return ((data ?? []) as ChatMessage[]).reverse();
     },
   });
 }
