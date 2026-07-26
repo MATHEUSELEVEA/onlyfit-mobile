@@ -45,6 +45,7 @@ import { NotificationsPage } from './features/notifications/NotificationsPage';
 import { PrivacyTermsPage } from './features/legal/PrivacyTermsPage';
 import { CreatorProfilePage } from './features/creators/CreatorProfilePage';
 import { HealthProfilePage } from './features/health/HealthProfilePage';
+import { MyFitHealthPage } from './features/health/MyFitHealthPage';
 import { HealthQuestionnairePage } from './features/health/HealthQuestionnairePage';
 import { NewHealthRecordPage } from './features/health/NewHealthRecordPage';
 import { HealthEventDetailPage } from './features/health/HealthEventDetailPage';
@@ -93,6 +94,7 @@ function AuthenticatedApp() {
           <Route path="/meu-fit/treino/player" element={<TrainingPlayerPage />} />
           <Route path="/meu-fit/treino/player/guiado" element={<GuidedSessionPage />} />
           <Route path="/meu-fit/dieta" element={<DietPage />} />
+          <Route path="/meu-fit/saude" element={<MyFitHealthPage />} />
           <Route path="/treino" element={<Navigate to="/meu-fit" replace />} />
           <Route path="/produtos" element={<ProductsPage />} />
           <Route path="/produtos/destaques" element={<PromotedProductsPage />} />

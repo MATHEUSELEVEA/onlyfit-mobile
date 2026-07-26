@@ -7,7 +7,7 @@ const items = [
   { to: '/meu-fit/rotina', key: 'meufit.routine.short', icon: Clock3 },
   { to: '/meu-fit/treino', key: 'meufit.training.short', icon: Dumbbell },
   { to: '/meu-fit/dieta', key: 'meufit.diet.short', icon: Salad },
-  { to: '/perfil/saude/novo?origem=meu-fit', key: 'meufit.health.short', icon: Stethoscope },
+  { to: '/meu-fit/saude', key: 'meufit.health.short', icon: Stethoscope },
 ] as const;
 
 export function MyFitSectionNav() {
@@ -16,7 +16,7 @@ export function MyFitSectionNav() {
   return (
     <nav className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Seções do My Fit">
       {items.map(({ to, key, icon: Icon }) => {
-        const active = pathname === to.split('?')[0] || (to.startsWith('/perfil/saude') && pathname.startsWith('/perfil/saude'));
+        const active = pathname === to;
         return (
           <Link
             key={to}

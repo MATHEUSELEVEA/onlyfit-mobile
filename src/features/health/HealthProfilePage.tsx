@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Activity,
@@ -48,6 +48,12 @@ const categoryIcons: Record<HealthCategory, LucideIcon> = {
 };
 
 export function HealthProfilePage() {
+  return <HealthProfileView />;
+}
+
+/// Ficha de saúde: anamnese + histórico. Em `embedded` vive dentro da aba
+/// "Ficha de saúde" de /meu-fit/saude, sem cabeçalho nem botão de novo registro.
+export function HealthProfileView({ embedded = false, onAddRecord }: { embedded?: boolean; onAddRecord?: () => void }) {
   const location = useLocation();
   const [category, setCategory] = useState<HealthCategory | 'all'>('all');
   const { data: consents = [], isLoading: consentsLoading, isError: consentsError, refetch: refetchConsents } =
@@ -57,37 +63,60 @@ export function HealthProfilePage() {
 
   if (consentsLoading) {
     return (
-      <HealthPageShell>
-        <HealthPageHeader title="Ficha de saúde" description="Carregando suas informações" backTo="/perfil" />
-        <main className="px-4 py-6"><LoadingRows /></main>
-      </HealthPageShell>
+      <ProfileShell embedded={embedded} title="Ficha de saúde" description="Carregando suas informações">
+        <LoadingRows />
+      </ProfileShell>
     );
   }
 
   if (consentsError) {
     return (
-      <HealthPageShell>
-        <HealthPageHeader title="Ficha de saúde" backTo="/perfil" />
-        <main className="px-4 py-6">
-          <FeedbackMessage type="error">Não foi possível verificar suas permissões de saúde.</FeedbackMessage>
-          <button
-            type="button"
-            onClick={() => void refetchConsents()}
-            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary"
-          >
-            <RefreshCw size={17} aria-hidden /> Tentar novamente
-          </button>
-        </main>
-      </HealthPageShell>
+      <ProfileShell embedded={embedded} title="Ficha de saúde">
+        <FeedbackMessage type="error">Não foi possível verificar suas permissões de saúde.</FeedbackMessage>
+        <button
+          type="button"
+          onClick={() => void refetchConsents()}
+          className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary"
+        >
+          <RefreshCw size={17} aria-hidden /> Tentar novamente
+        </button>
+      </ProfileShell>
     );
   }
 
-  if (!hasProfileConsent) return <HealthConsentIntro />;
+  if (!hasProfileConsent) return <HealthConsentIntro embedded={embedded} />;
 
-  return <HealthProfileContent category={category} setCategory={setCategory} success={location.state?.success} />;
+  return (
+    <HealthProfileContent
+      category={category}
+      setCategory={setCategory}
+      success={embedded ? undefined : location.state?.success}
+      embedded={embedded}
+      onAddRecord={onAddRecord}
+    />
+  );
 }
 
-function HealthConsentIntro() {
+// Casca da ficha: página inteira na rota própria, apenas o conteúdo quando
+// embutida em uma aba.
+function ProfileShell({ embedded, title, description, width = 'wide', actions, children }: {
+  embedded: boolean;
+  title: string;
+  description?: string;
+  width?: 'wide' | 'form';
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  if (embedded) return <div className="px-4 py-5">{children}</div>;
+  return (
+    <HealthPageShell width={width}>
+      <HealthPageHeader title={title} description={description} backTo="/perfil" actions={actions} />
+      <main className="px-4 py-6">{children}</main>
+    </HealthPageShell>
+  );
+}
+
+function HealthConsentIntro({ embedded }: { embedded: boolean }) {
   const [profileChecked, setProfileChecked] = useState(false);
   const [aiChecked, setAiChecked] = useState(false);
   const [error, setError] = useState('');
@@ -112,9 +141,8 @@ function HealthConsentIntro() {
   }
 
   return (
-    <HealthPageShell width="form">
-      <HealthPageHeader title="Ficha de saúde" description="Seus dados, sob seu controle" backTo="/perfil" />
-      <main className="space-y-6 px-4 py-6">
+    <ProfileShell embedded={embedded} width="form" title="Ficha de saúde" description="Seus dados, sob seu controle">
+      <div className="space-y-6">
         <section className="space-y-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <ShieldCheck size={24} aria-hidden />
@@ -183,8 +211,8 @@ function HealthConsentIntro() {
           {recordConsent.isPending ? <Loader2 size={17} className="animate-spin" aria-hidden /> : <ShieldCheck size={17} aria-hidden />}
           {recordConsent.isPending ? 'Registrando escolhas...' : 'Criar minha Ficha de saúde'}
         </button>
-      </main>
-    </HealthPageShell>
+      </div>
+    </ProfileShell>
   );
 }
 
@@ -192,10 +220,14 @@ function HealthProfileContent({
   category,
   setCategory,
   success,
+  embedded,
+  onAddRecord,
 }: {
   category: HealthCategory | 'all';
   setCategory: (category: HealthCategory | 'all') => void;
   success?: string;
+  embedded: boolean;
+  onAddRecord?: () => void;
 }) {
   const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useHealthEvents(category);
   const { data: anamnesisData } = useHealthEvents('anamnesis');
@@ -206,22 +238,22 @@ function HealthProfileContent({
   );
 
   return (
-    <HealthPageShell width="form">
-      <HealthPageHeader
-        title="Ficha de saúde"
-        description="Declarações, registros clínicos e exames"
-        backTo="/perfil"
-        actions={
-          <Link
-            to="/perfil/saude/novo"
-            aria-label="Adicionar registro de saúde"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <Plus size={20} aria-hidden />
-          </Link>
-        }
-      />
-      <main className="space-y-7 px-4 py-5">
+    <ProfileShell
+      embedded={embedded}
+      width="form"
+      title="Ficha de saúde"
+      description="Declarações, registros clínicos e exames"
+      actions={
+        <Link
+          to="/perfil/saude/novo"
+          aria-label="Adicionar registro de saúde"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Plus size={20} aria-hidden />
+        </Link>
+      }
+    >
+      <div className="space-y-7">
         {success ? <FeedbackMessage type="success">{success}</FeedbackMessage> : null}
 
         <section className="overflow-hidden rounded-2xl bg-surface-container-low">
@@ -274,7 +306,7 @@ function HealthProfileContent({
                 </button>
               </div>
             ) : null}
-            {!isLoading && !isError && events.length === 0 ? <HealthEmptyState /> : null}
+            {!isLoading && !isError && events.length === 0 ? <HealthEmptyState onAddRecord={onAddRecord} /> : null}
             {events.map((event) => <HealthEventRow key={event.id} event={event} />)}
           </div>
 
@@ -290,8 +322,8 @@ function HealthProfileContent({
             </button>
           ) : null}
         </section>
-      </main>
-    </HealthPageShell>
+      </div>
+    </ProfileShell>
   );
 }
 
@@ -334,7 +366,7 @@ function HealthEventRow({ event }: { event: HealthEvent }) {
   );
 }
 
-function HealthEmptyState() {
+function HealthEmptyState({ onAddRecord }: { onAddRecord?: () => void }) {
   return (
     <div className="py-8 text-center">
       <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-container text-on-surface-variant">
@@ -344,9 +376,15 @@ function HealthEmptyState() {
       <p className="mx-auto mt-1 max-w-[42ch] font-sans text-body-sm text-on-surface-variant">
         Responda à anamnese ou registre uma informação clínica que seja importante para você.
       </p>
-      <Link to="/perfil/saude/novo" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary">
-        <Plus size={17} aria-hidden /> Adicionar primeiro registro
-      </Link>
+      {onAddRecord ? (
+        <button type="button" onClick={onAddRecord} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary">
+          <Plus size={17} aria-hidden /> Adicionar primeiro registro
+        </button>
+      ) : (
+        <Link to="/perfil/saude/novo" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 font-sans text-label text-on-primary">
+          <Plus size={17} aria-hidden /> Adicionar primeiro registro
+        </Link>
+      )}
     </div>
   );
 }
