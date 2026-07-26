@@ -1,6 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Ban, CreditCard, Loader2, Plus, ReceiptText, Star, Trash2, Undo2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Ban,
+  CircleCheckBig,
+  Clock3,
+  CreditCard,
+  Loader2,
+  Plus,
+  ReceiptText,
+  Repeat,
+  Search,
+  Star,
+  Trash2,
+  Undo2,
+  CircleX,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import { useTranslation } from '@/i18n/I18nProvider';
 import { AddCardSheet } from './AddCardSheet';
@@ -11,18 +26,38 @@ import {
   type PaymentCard,
 } from './usePaymentCards';
 import { usePaymentTransactions, type PaymentTransaction } from './usePaymentTransactions';
+import { usePaymentSubscriptions, type PaymentSubscription } from './usePaymentSubscriptions';
+import {
+  matchesPaymentQuery,
+  paymentDescription,
+  paymentOutcome,
+  type PaymentOutcome,
+  type PaymentOutcomeFilter,
+} from './paymentStatement';
 import { useCancelSubscription, useRefundTransaction, isWithinRefundWindow } from './usePaymentActions';
 
-type PaymentsTab = 'cartoes' | 'pagamentos';
+type PaymentsTab = 'cartoes' | 'assinaturas' | 'pagamentos';
+
+const TAB_PARAMS: Record<PaymentsTab, string> = {
+  cartoes: 'cartoes',
+  assinaturas: 'assinaturas',
+  pagamentos: 'pagamentos',
+};
+
+function formatBRL(value: number | string): string {
+  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
 export function PaymentsPage() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab: PaymentsTab = searchParams.get('aba') === 'pagamentos' ? 'pagamentos' : 'cartoes';
+  const param = searchParams.get('aba');
+  const tab: PaymentsTab =
+    param === 'pagamentos' ? 'pagamentos' : param === 'assinaturas' ? 'assinaturas' : 'cartoes';
   const shouldOpenAddCard = searchParams.get('adicionarCartao') === '1';
 
   const setTab = (next: PaymentsTab) =>
-    setSearchParams(next === 'pagamentos' ? { aba: 'pagamentos' } : {}, { replace: true });
+    setSearchParams(next === 'cartoes' ? {} : { aba: TAB_PARAMS[next] }, { replace: true });
 
   function clearAddCardIntent() {
     const next = new URLSearchParams(searchParams);
@@ -32,6 +67,7 @@ export function PaymentsPage() {
 
   const tabs: ReadonlyArray<{ key: PaymentsTab; label: string }> = [
     { key: 'cartoes', label: t('payments.tab.cards') },
+    { key: 'assinaturas', label: t('payments.tab.subscriptions') },
     { key: 'pagamentos', label: t('payments.tab.history') },
   ];
 
@@ -53,7 +89,7 @@ export function PaymentsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2" role="tablist" aria-label={t('payments.title')}>
+          <div className="grid grid-cols-3" role="tablist" aria-label={t('payments.title')}>
             {tabs.map(({ key, label }) => (
               <button
                 key={key}
@@ -76,11 +112,11 @@ export function PaymentsPage() {
         </header>
 
         <main className="px-4 pt-4">
-          {tab === 'cartoes' ? (
+          {tab === 'cartoes' && (
             <CardsTab openAddCard={shouldOpenAddCard} onOpenAddCardHandled={clearAddCardIntent} />
-          ) : (
-            <HistoryTab />
           )}
+          {tab === 'assinaturas' && <SubscriptionsTab />}
+          {tab === 'pagamentos' && <HistoryTab />}
         </main>
       </div>
     </div>
@@ -227,53 +263,316 @@ function CardRow({ card }: { card: PaymentCard }) {
   );
 }
 
-function HistoryTab() {
+function SubscriptionsTab() {
   const { t } = useTranslation();
-  const { data: transactions = [], isLoading, isError } = usePaymentTransactions();
-  if (isLoading) return <div className="flex min-h-40 items-center justify-center"><Loader2 size={26} className="animate-spin text-primary" /></div>;
-  if (isError) return <p role="alert" className="rounded-2xl bg-error-container p-4 font-sans text-body-sm text-on-error-container">{t('payments.history.loadError')}</p>;
-  if (!transactions.length) return <EmptyState icon={ReceiptText} title={t('payments.history.emptyTitle')} description={t('payments.history.emptyDescription')} />;
+  const { data: subscriptions = [], isLoading, isError } = usePaymentSubscriptions();
+
+  if (isLoading)
+    return (
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-primary" aria-label={t('payments.loading')} />
+      </div>
+    );
+  if (isError)
+    return (
+      <p role="alert" className="rounded-2xl bg-error-container p-4 font-sans text-body-sm text-on-error-container">
+        {t('payments.subscriptions.loadError')}
+      </p>
+    );
+  if (!subscriptions.length)
+    return (
+      <EmptyState
+        icon={Repeat}
+        title={t('payments.subscriptions.emptyTitle')}
+        description={t('payments.subscriptions.emptyDescription')}
+      />
+    );
+
   return (
     <section className="space-y-3">
-      {transactions.map((transaction) => <PaymentRow key={transaction.id} transaction={transaction} />)}
+      {subscriptions.map((subscription) => (
+        <SubscriptionRow key={subscription.id} subscription={subscription} />
+      ))}
     </section>
   );
 }
 
-function PaymentRow({ transaction }: { transaction: PaymentTransaction }) {
+function SubscriptionRow({ subscription }: { subscription: PaymentSubscription }) {
   const { t } = useTranslation();
   const cancelSubscription = useCancelSubscription();
-  const refundTransaction = useRefundTransaction();
   const [error, setError] = useState<string | null>(null);
 
-  const statusKey = transaction.settlement_status || transaction.status;
-  const labels: Record<string, string> = {
-    pending: t('payments.history.status.pending'),
-    confirmed: t('payments.history.status.confirmed'),
-    settled: t('payments.history.status.settled'),
-    refunded: t('payments.history.status.refunded'),
-    chargeback: t('payments.history.status.chargeback'),
-    failed: t('payments.history.status.failed'),
+  const cycleLabels: Record<string, string> = {
+    MONTHLY: t('payments.subscriptions.cycle.monthly'),
+    BIMONTHLY: t('payments.subscriptions.cycle.bimonthly'),
+    QUARTERLY: t('payments.subscriptions.cycle.quarterly'),
+    SEMIANNUALLY: t('payments.subscriptions.cycle.semiannually'),
+    YEARLY: t('payments.subscriptions.cycle.yearly'),
+  };
+  const statusLabels: Record<string, string> = {
+    active: t('payments.subscriptions.status.active'),
+    inactive: t('payments.subscriptions.status.inactive'),
+    canceled: t('payments.subscriptions.status.canceled'),
+    expired: t('payments.subscriptions.status.expired'),
+    past_due: t('payments.subscriptions.status.pastDue'),
   };
 
-  const finalized = ['refunded', 'chargeback', 'failed', 'canceled'].includes(transaction.status);
-  const canCancel =
-    transaction.billing_type === 'recurring' && Boolean(transaction.subscription_id) && !finalized;
-  const canRefund =
-    transaction.billing_type === 'one_time' &&
-    ['confirmed', 'settled'].includes(statusKey) &&
-    isWithinRefundWindow(transaction.created_at);
-  const busy = cancelSubscription.isPending || refundTransaction.isPending;
+  const active = subscription.status === 'active' || subscription.status === 'past_due';
+  const title =
+    subscription.offering_name || subscription.professional_name || t('payments.history.subscription');
 
   function handleCancel() {
     setError(null);
-    if (!transaction.subscription_id) return;
     if (!window.confirm(t('payments.history.cancelConfirm'))) return;
-    cancelSubscription.mutate(transaction.subscription_id, {
+    cancelSubscription.mutate(subscription.id, {
       onError: (mutationError) =>
         setError(mutationError instanceof Error ? mutationError.message : t('payments.history.actionError')),
     });
   }
+
+  return (
+    <article className="rounded-2xl border border-outline-variant/40 bg-surface p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Repeat size={18} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-sans text-body font-medium text-on-surface">{title}</p>
+          {subscription.professional_name && subscription.offering_name && (
+            <p className="truncate font-sans text-body-sm text-on-surface-variant">
+              {subscription.professional_name}
+            </p>
+          )}
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="font-sans text-body font-semibold text-on-surface">{formatBRL(subscription.value)}</p>
+          <span className="font-sans text-counter text-on-surface-variant">
+            {cycleLabels[subscription.cycle] ?? subscription.cycle}
+          </span>
+        </div>
+      </div>
+
+      <dl className="mt-3 space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <dt className="font-sans text-body-sm text-on-surface-variant">
+            {t('payments.subscriptions.statusLabel')}
+          </dt>
+          <dd
+            className={clsx(
+              'font-sans text-label',
+              active ? 'text-primary' : 'text-on-surface-variant',
+            )}
+          >
+            {statusLabels[subscription.status] ?? subscription.status}
+          </dd>
+        </div>
+        {subscription.next_due_date && active && (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-sans text-body-sm text-on-surface-variant">
+              {t('payments.subscriptions.nextCharge')}
+            </dt>
+            <dd className="font-sans text-body-sm text-on-surface">
+              {new Date(`${subscription.next_due_date}T00:00:00`).toLocaleDateString()}
+            </dd>
+          </div>
+        )}
+        {subscription.card_last4 && (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-sans text-body-sm text-on-surface-variant">
+              {t('payments.subscriptions.chargedTo')}
+            </dt>
+            <dd className="font-sans text-body-sm text-on-surface">
+              {subscription.card_brand ? `${subscription.card_brand} ` : ''}•••• {subscription.card_last4}
+            </dd>
+          </div>
+        )}
+      </dl>
+
+      {active && (
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={cancelSubscription.isPending}
+          className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-surface-container px-3 font-sans text-label text-on-surface transition-colors active:bg-surface-container-high disabled:opacity-60"
+        >
+          {cancelSubscription.isPending ? (
+            <Loader2 size={15} className="animate-spin" aria-hidden />
+          ) : (
+            <Ban size={15} aria-hidden />
+          )}
+          {t('payments.history.cancelSubscription')}
+        </button>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-2 font-sans text-body-sm text-error">
+          {error}
+        </p>
+      )}
+    </article>
+  );
+}
+
+function HistoryTab() {
+  const { t } = useTranslation();
+  const { data: transactions = [], isLoading, isError } = usePaymentTransactions();
+  const [outcomeFilter, setOutcomeFilter] = useState<PaymentOutcomeFilter>('all');
+  const [query, setQuery] = useState('');
+
+  const fallback = useMemo(
+    () => ({ subscription: t('payments.history.subscription'), oneTime: t('payments.history.oneTime') }),
+    [t],
+  );
+
+  const filtered = useMemo(
+    () =>
+      transactions.filter((transaction) => {
+        const outcome = paymentOutcome(transaction);
+        if (outcomeFilter !== 'all' && outcome !== outcomeFilter) return false;
+        return matchesPaymentQuery(transaction, query, paymentDescription(transaction, fallback));
+      }),
+    [transactions, outcomeFilter, query, fallback],
+  );
+
+  const filters: ReadonlyArray<{ key: PaymentOutcomeFilter; label: string }> = [
+    { key: 'all', label: t('payments.history.filter.all') },
+    { key: 'approved', label: t('payments.history.filter.approved') },
+    { key: 'declined', label: t('payments.history.filter.declined') },
+  ];
+
+  if (isLoading)
+    return (
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-primary" aria-label={t('payments.loading')} />
+      </div>
+    );
+  if (isError)
+    return (
+      <p role="alert" className="rounded-2xl bg-error-container p-4 font-sans text-body-sm text-on-error-container">
+        {t('payments.history.loadError')}
+      </p>
+    );
+  if (!transactions.length)
+    return (
+      <EmptyState
+        icon={ReceiptText}
+        title={t('payments.history.emptyTitle')}
+        description={t('payments.history.emptyDescription')}
+      />
+    );
+
+  return (
+    <section className="space-y-3">
+      <label className="flex min-h-11 items-center gap-2 rounded-full bg-surface-container px-4">
+        <Search size={16} className="shrink-0 text-on-surface-variant" aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t('payments.history.searchPlaceholder')}
+          aria-label={t('payments.history.searchLabel')}
+          className="min-w-0 flex-1 bg-transparent font-sans text-body text-on-surface outline-none placeholder:text-on-surface-variant"
+        />
+      </label>
+
+      <div className="flex gap-2" role="group" aria-label={t('payments.history.filter.label')}>
+        {filters.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={outcomeFilter === key}
+            onClick={() => setOutcomeFilter(key)}
+            className={clsx(
+              'min-h-9 flex-1 rounded-full px-3 font-sans text-label transition-colors',
+              outcomeFilter === key
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-container text-on-surface-variant',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title={t('payments.history.noResultsTitle')}
+          description={t('payments.history.noResultsDescription')}
+        />
+      ) : (
+        filtered.map((transaction) => (
+          <PaymentRow
+            key={transaction.id}
+            transaction={transaction}
+            description={paymentDescription(transaction, fallback)}
+          />
+        ))
+      )}
+    </section>
+  );
+}
+
+function OutcomeBadge({ outcome }: { outcome: PaymentOutcome }) {
+  const { t } = useTranslation();
+  const config = {
+    approved: {
+      icon: CircleCheckBig,
+      label: t('payments.history.outcome.approved'),
+      className: 'bg-primary/15 text-primary',
+    },
+    declined: {
+      icon: CircleX,
+      label: t('payments.history.outcome.declined'),
+      className: 'bg-error-container text-on-error-container',
+    },
+    pending: {
+      icon: Clock3,
+      label: t('payments.history.outcome.pending'),
+      className: 'bg-surface-container-high text-on-surface-variant',
+    },
+  }[outcome];
+  const Icon = config.icon;
+
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-sans text-counter',
+        config.className,
+      )}
+    >
+      <Icon size={13} aria-hidden />
+      {config.label}
+    </span>
+  );
+}
+
+function PaymentRow({
+  transaction,
+  description,
+}: {
+  transaction: PaymentTransaction;
+  description: string;
+}) {
+  const { t } = useTranslation();
+  const refundTransaction = useRefundTransaction();
+  const [error, setError] = useState<string | null>(null);
+
+  const outcome = paymentOutcome(transaction);
+  const statusKey = transaction.settlement_status || transaction.status;
+  const detailLabels: Record<string, string> = {
+    settled: t('payments.history.status.settled'),
+    refunded: t('payments.history.status.refunded'),
+    chargeback: t('payments.history.status.chargeback'),
+  };
+  // Só vale mostrar o detalhe quando ele diz algo além do "aprovado/recusado".
+  const detail = detailLabels[transaction.status] ?? detailLabels[statusKey];
+
+  const canRefund =
+    transaction.billing_type === 'one_time' &&
+    ['confirmed', 'settled'].includes(statusKey) &&
+    transaction.status !== 'refunded' &&
+    isWithinRefundWindow(transaction.created_at);
 
   function handleRefund() {
     setError(null);
@@ -287,43 +586,59 @@ function PaymentRow({ transaction }: { transaction: PaymentTransaction }) {
   return (
     <article className="rounded-2xl border border-outline-variant/40 bg-surface p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><ReceiptText size={18} aria-hidden /></span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          {transaction.billing_type === 'recurring' ? (
+            <Repeat size={18} aria-hidden />
+          ) : (
+            <ReceiptText size={18} aria-hidden />
+          )}
+        </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-sans text-body font-medium text-on-surface">{transaction.billing_type === 'recurring' ? t('payments.history.subscription') : t('payments.history.oneTime')}</p>
-          <p className="mt-0.5 font-sans text-body-sm text-on-surface-variant">{new Date(transaction.created_at).toLocaleDateString()}</p>
+          <p className="truncate font-sans text-body font-medium text-on-surface">{description}</p>
+          <p className="mt-0.5 font-sans text-body-sm text-on-surface-variant">
+            {new Date(transaction.created_at).toLocaleDateString()}
+            {transaction.card_last4
+              ? ` · •••• ${transaction.card_last4}`
+              : transaction.payment_method === 'pix'
+                ? ` · ${t('payments.checkout.methodPix')}`
+                : ''}
+          </p>
         </div>
-        <div className="text-right">
-          <p className="font-sans text-body font-semibold text-on-surface">{Number(transaction.gross_value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-          <span className="font-sans text-counter text-on-surface-variant">{labels[statusKey] ?? statusKey}</span>
+        <div className="shrink-0 text-right">
+          <p className="font-sans text-body font-semibold text-on-surface">
+            {formatBRL(transaction.gross_value)}
+          </p>
+          <span className="font-sans text-counter text-on-surface-variant">
+            {transaction.billing_type === 'recurring'
+              ? t('payments.history.subscription')
+              : t('payments.history.oneTime')}
+          </span>
         </div>
       </div>
 
-      {(canCancel || canRefund) && (
-        <div className="mt-3 flex gap-2">
-          {canCancel && (
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={busy}
-              className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-surface-container px-3 font-sans text-label text-on-surface transition-colors active:bg-surface-container-high disabled:opacity-60"
-            >
-              {cancelSubscription.isPending ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Ban size={15} aria-hidden />}
-              {t('payments.history.cancelSubscription')}
-            </button>
-          )}
-          {canRefund && (
-            <button
-              type="button"
-              onClick={handleRefund}
-              disabled={busy}
-              className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-surface-container px-3 font-sans text-label text-on-surface transition-colors active:bg-surface-container-high disabled:opacity-60"
-            >
-              {refundTransaction.isPending ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Undo2 size={15} aria-hidden />}
-              {t('payments.history.requestRefund')}
-            </button>
-          )}
-        </div>
-      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <OutcomeBadge outcome={outcome} />
+        {detail && (
+          <span className="inline-flex items-center rounded-full bg-surface-container px-2 py-0.5 font-sans text-counter text-on-surface-variant">
+            {detail}
+          </span>
+        )}
+        {canRefund && (
+          <button
+            type="button"
+            onClick={handleRefund}
+            disabled={refundTransaction.isPending}
+            className="ml-auto inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-surface-container px-3 font-sans text-label text-on-surface transition-colors active:bg-surface-container-high disabled:opacity-60"
+          >
+            {refundTransaction.isPending ? (
+              <Loader2 size={15} className="animate-spin" aria-hidden />
+            ) : (
+              <Undo2 size={15} aria-hidden />
+            )}
+            {t('payments.history.requestRefund')}
+          </button>
+        )}
+      </div>
 
       {error && (
         <p role="alert" className="mt-2 font-sans text-body-sm text-error">
