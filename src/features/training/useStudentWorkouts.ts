@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { todayKey } from '@/lib/localDate';
 import type { WorkoutPrescription } from '@/features/profile/offerings/workoutPrescription';
 
 /** Códigos de dia usados por student_workout_assignments.days_of_week. */
@@ -160,6 +161,32 @@ export function useStudentWorkouts() {
         .eq('student_user_id', userId as string)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
+      if (error) throw error;
+      return ((data ?? []) as unknown as AssignmentRow[]).map(toStudentWorkout);
+    },
+  });
+
+  return { workouts: query.data ?? EMPTY_WORKOUTS, isLoading: query.isLoading, error: query.error };
+}
+
+/**
+ * Treinos agendados para hoje. A elegibilidade é do banco (dia da semana,
+ * semana do mesociclo, vigência e um card por treino): o protocolo vira uma
+ * atribuição por semana e por dia, e recortar isso no cliente significaria a
+ * mesma regra reescrita em cada app. A data vai daqui porque o servidor é UTC
+ * — à noite, no Brasil, já seria amanhã.
+ */
+export function useTodayWorkouts() {
+  const { session } = useAuth();
+  const userId = session?.user.id;
+  const date = todayKey();
+
+  const query = useQuery({
+    queryKey: ['student-workouts-today', userId, date],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async (): Promise<StudentWorkout[]> => {
+      const { data, error } = await supabase.rpc('get_student_workouts_for_date', { p_date: date });
       if (error) throw error;
       return ((data ?? []) as unknown as AssignmentRow[]).map(toStudentWorkout);
     },
