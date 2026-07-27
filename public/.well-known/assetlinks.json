@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.onlyfit.onlyfit_flutter_mobile",
+      "sha256_cert_fingerprints": [
+        "3B:F2:B5:D2:C4:1D:17:55:93:14:E8:C3:4B:2E:27:F0:77:ED:D6:B7:4E:3B:95:D3:C6:FF:4C:90:20:89:6A:47"
+      ]
+    }
+  }
+]
