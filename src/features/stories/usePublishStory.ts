@@ -77,11 +77,17 @@ export function usePublishStory() {
         },
       });
       if (error) throw error;
-      // Normaliza a orientação/qualidade do vídeo de story no Cloudflare Stream
-      // (mesmo pipeline dos posts). Em segundo plano; o StoryCard toca o R2 cru
-      // até o HLS ficar pronto. Falha aqui não impede a publicação do story.
+      // Confirma que o Cloudflare aceitou o vídeo. A reconciliação até HLS
+      // pronto continua em background no servidor, mas nunca mantemos no feed
+      // um story cujo processamento sequer começou.
       if (input.kind === 'video') {
-        void supabase.functions.invoke('cloudflare-stream-ingest', { body: { story_id: String(storyId) } }).catch(() => {});
+        const { error: ingestError } = await supabase.functions.invoke('cloudflare-stream-ingest', {
+          body: { story_id: String(storyId) },
+        });
+        if (ingestError) {
+          await supabase.from('stories').delete().eq('id', String(storyId)).eq('creator_id', userId);
+          throw new Error('O vídeo foi enviado, mas não pôde ser preparado para reprodução. Tente novamente.');
+        }
       }
       return String(storyId);
     },
