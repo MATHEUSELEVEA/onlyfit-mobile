@@ -78,6 +78,16 @@ export function registerCapacitorAppBridge(navigate: NavigateFunction): () => vo
       .catch(() => undefined);
   });
 
+  // Local reminder actions carry a validated in-app route. This keeps a tap
+  // on a water reminder deterministic after a cold start or app resume.
+  void import('@capacitor/local-notifications').then(({ LocalNotifications }) => {
+    void LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
+      const extra = notification.extra as Record<string, unknown> | undefined;
+      const route = typeof extra?.route === 'string' ? extra.route : null;
+      if (route?.startsWith('/meu-fit/rotina')) navigate(route);
+    }).then((handle) => disposers.push(() => handle.remove()));
+  });
+
   return () => {
     for (const dispose of disposers) dispose();
     disposers.length = 0;

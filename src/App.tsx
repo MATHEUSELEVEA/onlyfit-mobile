@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { queryClient } from './lib/queryClient';
 import { ThemeProvider } from './theme/ThemeProvider';
@@ -63,6 +63,11 @@ function CreatorProfileRoute() {
   return <CreatorProfilePage key={username} />;
 }
 
+function LegacyProtocolRoute() {
+  const location = useLocation();
+  return <Navigate to={`/meu-fit/rotina${location.search}`} replace />;
+}
+
 function AuthenticatedApp() {
   const { session, loading } = useAuth();
 
@@ -90,6 +95,8 @@ function AuthenticatedApp() {
           <Route path="/meu-fit" element={<MeuFitPage />} />
           <Route path="/meu-fit/ia" element={<MyFitAiPage />} />
           <Route path="/meu-fit/rotina" element={<RoutinePage />} />
+          {/* Compatibilidade com deep links do Flutter e notificações do protocolo. */}
+          <Route path="/meu-fit/protocolo" element={<LegacyProtocolRoute />} />
           <Route path="/meu-fit/treino" element={<TrainingPage />} />
           <Route path="/meu-fit/treino/player" element={<TrainingPlayerPage />} />
           <Route path="/meu-fit/treino/player/guiado" element={<GuidedSessionPage />} />
