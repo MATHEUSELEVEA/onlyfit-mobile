@@ -178,11 +178,17 @@ export async function runCreatePost(
   });
   if (postError) throw postError;
 
-  // Normaliza a orientação do vídeo no Cloudflare Stream em segundo plano
-  // (corrige verticais "deitados"). O feed toca o R2 cru até o HLS ficar
-  // pronto; uma falha aqui não impede a publicação.
+  // Confirma que o Cloudflare aceitou o vídeo antes de concluir. A codificação
+  // continua em background no servidor; se a cópia nem começou, removemos a
+  // linha para não publicar um vídeo quebrado silenciosamente.
   if (cover.kind === 'video') {
-    void supabase.functions.invoke('cloudflare-stream-ingest', { body: { post_id: String(postId) } }).catch(() => {});
+    const { error: ingestError } = await supabase.functions.invoke('cloudflare-stream-ingest', {
+      body: { post_id: String(postId) },
+    });
+    if (ingestError) {
+      await supabase.from('posts').delete().eq('id', String(postId)).eq('creator_id', userId);
+      throw new Error('O vídeo foi enviado, mas não pôde ser preparado para reprodução. Tente novamente.');
+    }
   }
 
   return String(postId);

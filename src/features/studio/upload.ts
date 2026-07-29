@@ -6,6 +6,26 @@ import { supabase } from '@/lib/supabase';
 
 type Bucket = 'onlyfit-media' | 'onlyfit-thumbnails' | 'onlyfit-avatar' | 'onlyfit-stories';
 
+function assertReadableStoryUrl(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('O servidor de mídia não forneceu uma URL válida para o story.');
+  }
+  const privateR2 =
+    parsed.hostname === 'r2.cloudflarestorage.com' ||
+    parsed.hostname.endsWith('.r2.cloudflarestorage.com');
+  const signedR2Read =
+    privateR2 &&
+    parsed.searchParams.has('X-Amz-Signature') &&
+    parsed.searchParams.get('X-Amz-Algorithm') === 'AWS4-HMAC-SHA256';
+  if (parsed.protocol !== 'https:' || (privateR2 && !signedR2Read) || !parsed.pathname) {
+    throw new Error('O servidor de mídia não forneceu uma URL legível para o story.');
+  }
+  return value;
+}
+
 function shouldUploadThroughFunction(file: Blob): boolean {
   if (typeof window === 'undefined') return false;
   const protocol = window.location.protocol;
@@ -59,7 +79,7 @@ export async function uploadAsset(
     onProgress?.(1);
 
     const { publicUrl } = data as { publicUrl: string };
-    return publicUrl;
+    return bucket === 'onlyfit-stories' ? assertReadableStoryUrl(publicUrl) : publicUrl;
   }
 
   const { data, error } = await supabase.functions.invoke('create-r2-upload-url', {
@@ -75,7 +95,7 @@ export async function uploadAsset(
   const { uploadUrl, publicUrl } = data as { uploadUrl: string; publicUrl: string };
   await putWithProgress(uploadUrl, file, contentType, onProgress);
 
-  return publicUrl;
+  return bucket === 'onlyfit-stories' ? assertReadableStoryUrl(publicUrl) : publicUrl;
 }
 
 // Captura o primeiro quadro de um vídeo local como poster (thumbnail_url). É
