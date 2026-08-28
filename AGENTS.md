@@ -24,3 +24,10 @@ As regras invioláveis, a stack, como rodar e a estrutura de pastas estão lá. 
 - Antes de "pronto": `npm run build` e `npm run lint` limpos, e teste o fluxo real no app.
 
 Qualquer conflito entre este resumo e o `CLAUDE.md`: **o `CLAUDE.md` vence.**
+
+## Fluxo obrigatório do Trello
+
+- A fonte das tarefas é o quadro Onlyfit: https://trello.com/b/INcLFTEw/onlyfit.
+- Só desenvolva cards que já estejam em `Implementar (Baico, Dani)`; leia descrição, comentários, checklists, anexos e ajustes antes de editar.
+- Antes de qualquer alteração, abra `Membros` no card e adicione `matheus martins` (`matheusmartins42`, ARI `ari:cloud:trello::user/6a90ed725beaa073d9bdadc2`), confirmando que ele aparece como membro do cartão. Não use etiqueta com nome nem apenas uma menção. Se a integração não permitir atribuir, pare e informe; não pule a etapa.
+- Priorize a etiqueta `PRIORIDADE`; mantenha o card em Implementar durante o trabalho. Ao concluir e testar, comente o resumo técnico e os testes e mova para `Validar (Nã, Deni)`, nunca diretamente para Pronto.
