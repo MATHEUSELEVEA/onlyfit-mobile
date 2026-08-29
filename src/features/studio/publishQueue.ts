@@ -103,13 +103,14 @@ async function runJob(localId: string): Promise<void> {
 // Publica em background: registra o post otimista na fila imediatamente e
 // retorna sem esperar o upload — o FeedPage o renderiza mesmo sem cache prévio.
 export function enqueuePublish(input: CreatePostInput, profile: MyProfile): string {
-  const randomId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const randomId = globalThis.crypto.randomUUID();
   const localId = `local-${randomId}`;
-  const post = buildOptimisticPost(input, profile, localId);
+  const stableInput = { ...input, clientRequestId: randomId };
+  const post = buildOptimisticPost(stableInput, profile, localId);
   jobs.set(localId, {
     status: 'uploading',
     progress: 0,
-    input,
+    input: stableInput,
     profile,
     post,
     snapshot: { status: 'uploading', progress: 0 },
