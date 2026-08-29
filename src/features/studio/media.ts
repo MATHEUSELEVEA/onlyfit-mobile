@@ -76,6 +76,32 @@ export function contentTypeForMedia(file: File, kind: MediaKind): string {
   return kind === 'image' ? 'image/jpeg' : 'video/mp4';
 }
 
+/** Lê a duração real do contêiner antes de qualquer upload. */
+export function readVideoDuration(file: File, timeoutMs = 5000): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    let settled = false;
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    const timer = window.setTimeout(() => finish(null), timeoutMs);
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      finish(Number.isFinite(duration) && duration > 0 ? duration : null);
+    };
+    video.onerror = () => finish(null);
+    video.src = url;
+  });
+}
+
 let draftSeq = 0;
 
 export function createDraftMedia(file: File): DraftMedia | null {

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import { captureVideoPoster, uploadAsset } from './upload';
-import { contentTypeForMedia, fileExtension, type DraftMedia, type PostLocation } from './media';
+import { captureVideoPoster, uploadAsset, uploadVerifiedVideo } from './upload';
+import { contentTypeForMedia, fileExtension, readVideoDuration, type DraftMedia, type PostLocation } from './media';
 import type { CaptionTrack } from '@/lib/captions';
 import type { MyProfile } from '@/features/profile/useMyProfile';
 import type { FeedPost } from '@/features/feed/types';
@@ -15,6 +15,7 @@ export interface CreatePostInput {
   location?: PostLocation | null;
   captions?: CaptionTrack | null;
   visibility: PostVisibility;
+  clientRequestId?: string;
 }
 
 interface UploadedMedia {
@@ -47,12 +48,27 @@ function errorMessage(error: unknown): string {
 export function getCreatePostErrorMessage(error: unknown): string {
   const code = errorCode(error);
   const message = errorMessage(error);
+  const safeMessage = error instanceof Error ? error.message : '';
+
+  if (
+    message.includes('armazenamento de vídeos') ||
+    message.includes('conexão foi interrompida') ||
+    message.includes('envio do vídeo demorou') ||
+    message.includes('serviço de vídeos recusou') ||
+    message.includes('não confirmou a segurança do vídeo')
+  ) return safeMessage;
 
   if (message.includes('mime type not allowed')) {
     return 'Este formato de mídia não está liberado para publicação. Escolha outro arquivo ou tente exportar a mídia novamente.';
   }
   if (message.includes('file exceeds limit')) {
     return 'Este arquivo é grande demais para publicar agora. Escolha uma mídia menor e tente novamente.';
+  }
+  if (message.includes('no máximo 1 minuto')) {
+    return 'O vídeo pode ter no máximo 1 minuto. Edite o vídeo antes de publicar.';
+  }
+  if (message.includes('verificar a duração')) {
+    return 'Não foi possível verificar a duração deste vídeo. Escolha o arquivo novamente.';
   }
   if (message.includes('falha ao enviar') || message.includes('upload') || message.includes('r2')) {
     return 'Não foi possível enviar a mídia. Verifique sua conexão e tente publicar novamente.';
@@ -100,7 +116,9 @@ async function uploadDraft(
   // A mídia em si é a maior parte do upload; o poster é tratado como um extra
   // fora dessa fração de progresso para a porcentagem nunca andar para trás.
   const [url, thumbnailUrl] = await Promise.all([
-    uploadAsset(draft.file, `${draft.kind}_${stamp}.${ext}`, contentType, 'onlyfit-media', onProgress),
+    draft.kind === 'video'
+      ? uploadVerifiedVideo(draft.file, `video_${stamp}.${ext}`, contentType, onProgress)
+      : uploadAsset(draft.file, `image_${stamp}.${ext}`, contentType, 'onlyfit-media', onProgress),
     thumbnailPromise,
   ]);
 
@@ -128,6 +146,17 @@ export async function runCreatePost(
   const userId = authData.user.id;
   if (!userId) throw new Error('Sua sessão expirou. Entre novamente.');
   if (input.media.length === 0) throw new Error('Escolha ao menos uma mídia.');
+  if (!input.clientRequestId) throw new Error('A tentativa de publicação é inválida. Tente novamente.');
+  for (const draft of input.media) {
+    if (draft.kind !== 'video') continue;
+    const duration = await readVideoDuration(draft.file);
+    if (duration === null) {
+      throw new Error('Não foi possível verificar a duração deste vídeo.');
+    }
+    if (duration > 60) {
+      throw new Error('O vídeo pode ter no máximo 1 minuto.');
+    }
+  }
 
   const progressByIndex = new Array(input.media.length).fill(0);
   const reportProgress = (index: number, fraction: number) => {
@@ -160,6 +189,7 @@ export async function runCreatePost(
   const { data: postId, error: postError } = await supabase.rpc('create_post_with_media', {
     p_post: {
       creator_id: userId,
+      client_request_id: input.clientRequestId,
       description: input.caption.trim() || null,
       sports: input.sports,
       is_premium: input.visibility === 'paid_members',
@@ -178,17 +208,13 @@ export async function runCreatePost(
   });
   if (postError) throw postError;
 
-  // Confirma que o Cloudflare aceitou o vídeo antes de concluir. A codificação
-  // continua em background no servidor; se a cópia nem começou, removemos a
-  // linha para não publicar um vídeo quebrado silenciosamente.
+  // A publicação já existe e a reconciliação do servidor retoma ingestões
+  // transitórias. Nunca apague/recrie o post aqui: isso transformava uma falha
+  // posterior ao commit em duplicata quando a pessoa tocava em tentar de novo.
   if (cover.kind === 'video') {
-    const { error: ingestError } = await supabase.functions.invoke('cloudflare-stream-ingest', {
+    await supabase.functions.invoke('cloudflare-stream-ingest', {
       body: { post_id: String(postId) },
     });
-    if (ingestError) {
-      await supabase.from('posts').delete().eq('id', String(postId)).eq('creator_id', userId);
-      throw new Error('O vídeo foi enviado, mas não pôde ser preparado para reprodução. Tente novamente.');
-    }
   }
 
   return String(postId);
