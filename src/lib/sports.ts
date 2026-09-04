@@ -4,12 +4,12 @@
 // para cá nem "só como fallback".
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
+  Activity, Anvil, Award, BedDouble, Beef, Bike, Brain, Carrot, Compass, Crosshair, Crown,
   Apple as AppleIcon,
-  Dumbbell,
-  Footprints,
-  Medal,
-  Sparkles,
-  Swords,
+  Dumbbell, Egg, Fish, Flame, Flower, Footprints, Gem, Goal, Heart, HeartPulse, Leaf,
+  Medal, Milk, Moon, Mountain, MountainSnow, PersonStanding, Pill, Rocket, Route, Salad,
+  Shield, Smile, Sparkles, Star, Sun, Swords, Target, Timer, TrendingUp, Trophy, Users,
+  Volleyball, Waves, Weight, Wheat, Wind, Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -93,12 +93,12 @@ export function useAffinityGroups() {
 // taxonomia inteira continuar sendo dado. Um fallback mantém a UI íntegra se
 // surgir um ícone ainda não mapeado aqui.
 const AFFINITY_ICONS: Record<string, LucideIcon> = {
-  Dumbbell,
-  Sparkles,
-  Swords,
-  Footprints,
-  Medal,
-  Apple: AppleIcon,
+  Dumbbell, Weight, Anvil, Activity, Flame, Zap, TrendingUp, Target,
+  Footprints, Bike, Waves, Mountain, MountainSnow, Route, Timer, Wind,
+  Swords, Trophy, Medal, Volleyball, Goal, Shield, Crosshair, Award,
+  Apple: AppleIcon, Salad, Carrot, Egg, Beef, Fish, Wheat, Milk, HeartPulse, Pill,
+  Sparkles, Sun, Moon, Leaf, Flower, Brain, Smile, BedDouble,
+  Users, Star, Crown, Rocket, Gem, PersonStanding, Heart, Compass,
 };
 
 /** Componente lucide para o ícone de um grupo de afinidade (com fallback). */

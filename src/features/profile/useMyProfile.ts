@@ -44,16 +44,16 @@ export function useMyProfile() {
     queryKey: myProfileQueryKey(userId),
     enabled: Boolean(userId),
     queryFn: async (): Promise<MyProfile | null> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(
-          `id, username, full_name, avatar_url, bio, country_code, language, is_creator, is_professional, is_ambassador, social_links,
+      const [{ data, error }, { data: identities, error: identityError }] = await Promise.all([
+        supabase.from('profiles').select(
+          `id, username, full_name, avatar_url, bio, country_code, language, is_creator, is_professional, social_links,
            creator_profiles ( sports )`,
-        )
-        .eq('id', userId!)
-        .maybeSingle();
+        ).eq('id', userId!).maybeSingle(),
+        supabase.rpc('get_public_ambassador_identities', { p_profile_ids: [userId!] }),
+      ]);
 
       if (error) throw error;
+      if (identityError) throw identityError;
       if (!data) return null;
 
       const cp = firstRow<{ sports: string[] | null }>(data.creator_profiles);
@@ -67,7 +67,7 @@ export function useMyProfile() {
         language: data.language,
         isCreator: Boolean(data.is_creator),
         isProfessional: Boolean((data as { is_professional?: boolean | null }).is_professional),
-        isAmbassador: Boolean((data as { is_ambassador?: boolean | null }).is_ambassador),
+        isAmbassador: Boolean((identities as Record<string, unknown> | null)?.[userId!]),
         affinitySports: cp?.sports ?? [],
         socialLinks: normalizeSocialLinks((data as { social_links?: unknown }).social_links),
       };

@@ -204,7 +204,7 @@ function AmbassadorRail({
                     {compactName}
                   </span>
                   <span className="block truncate font-sans text-nav leading-tight text-on-surface-variant">
-                    {ambassador.ambassadorHeadline || (sport ? labelFor(sport) : ambassador.ambassadorBadge || t('explore.ambassadors.fallback'))}
+                    {ambassador.ambassadorBadge || ambassador.ambassadorHeadline || (sport ? labelFor(sport) : t('explore.ambassadors.fallback'))}
                   </span>
                 </>
               );
@@ -561,11 +561,8 @@ export function ExplorePage() {
   const ambassadors = useMemo(() => {
     const editorial = ambassadorsQuery.data ?? [];
     const affinityOrder = groups.map((group) => group.key);
-    if (editorial.length > 0) return oneAmbassadorPerAffinity(editorial, affinityOrder);
-    return oneAmbassadorPerAffinity((creatorsQuery.data ?? [])
-      .filter((creator) => creator.isProfessional)
-      .filter((creator) => ambassadorAffinityKey(creator)), affinityOrder);
-  }, [ambassadorsQuery.data, creatorsQuery.data, groups]);
+    return oneAmbassadorPerAffinity(editorial, affinityOrder);
+  }, [ambassadorsQuery.data, groups]);
 
   const creators = useMemo(() => {
     let list = creatorsQuery.data ?? [];

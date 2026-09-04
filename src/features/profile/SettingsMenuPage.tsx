@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  BadgeCheck,
   Building2,
   Gavel,
   Loader2,
@@ -97,6 +98,9 @@ export function SettingsMenuPage() {
               title={t('profile.settings.challenges')}
               to="/desafios"
             />
+            {isProfessional ? (
+              <ProfileLink icon={BadgeCheck} title="Rede de Embaixadores" to="/rede-embaixadores" />
+            ) : null}
           </div>
         </div>
 

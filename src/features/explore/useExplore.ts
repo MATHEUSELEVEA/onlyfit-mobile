@@ -31,33 +31,6 @@ interface CreatorRow {
     | null;
 }
 
-interface FeaturedAmbassadorRow {
-  id: string;
-  profile_id: string;
-  sport_key: string | null;
-  headline: string | null;
-  badge_label: string | null;
-  profiles:
-    | (CreatorRow & {
-        creator_profiles:
-          | { bio: string | null; sports: string[] | null; follower_count: number | null }
-          | { bio: string | null; sports: string[] | null; follower_count: number | null }[]
-          | null;
-      })
-    | (CreatorRow & {
-        creator_profiles:
-          | { bio: string | null; sports: string[] | null; follower_count: number | null }
-          | { bio: string | null; sports: string[] | null; follower_count: number | null }[]
-          | null;
-      })[]
-    | null;
-}
-
-function isMissingEditorialTableError(error: unknown, tableName: string): boolean {
-  const maybe = error as { code?: string; message?: string } | null | undefined;
-  return maybe?.code === '42P01' || maybe?.code === 'PGRST205' || new RegExp(`${tableName}|does not exist`, 'i').test(maybe?.message ?? '');
-}
-
 function toExploreCreator(
   row: CreatorRow,
   followedIds: Set<string>,
@@ -144,28 +117,13 @@ export function useFeaturedAmbassadors() {
     enabled: Boolean(userId),
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<ExploreCreator[]> => {
-      const { data, error } = await supabase
-        .from('featured_ambassadors')
-        .select(
-          `id, profile_id, sport_key, headline, badge_label,
-           profiles:profile_id (
-	             id, username, full_name, avatar_url, is_professional,
-             creator_profiles (bio, sports, follower_count)
-           )`,
-        )
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false })
-        .limit(12);
-
-      if (error) {
-        if (isMissingEditorialTableError(error, 'featured_ambassadors')) return [];
-        throw error;
-      }
-
-      const rows = (data ?? []) as unknown as FeaturedAmbassadorRow[];
-      const profileRows = rows
-        .map((row) => (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles))
-        .filter((profile): profile is CreatorRow => Boolean(profile?.id));
+      const { data, error } = await supabase.rpc('list_public_ambassadors' as never, {
+        p_affinity_group_key: null, p_region_id: null, p_limit: 100, p_offset: 0,
+      } as never);
+      if (error) throw error;
+      const payload = data as unknown as { items?: Array<Record<string, unknown>> } | null;
+      const rows = payload?.items ?? [];
+      const profileRows = rows.map((row) => row.profile as Record<string, unknown>);
 
       const { data: follows } = profileRows.length
         ? await supabase
@@ -173,23 +131,22 @@ export function useFeaturedAmbassadors() {
             .select('creator_id')
             .eq('follower_id', userId!)
             .eq('status', 'active')
-            .in('creator_id', profileRows.map((profile) => profile.id))
+            .in('creator_id', profileRows.map((profile) => String(profile.id)))
         : { data: [] };
       const followedIds = new Set(
         ((follows ?? []) as { creator_id: string }[]).map((row) => row.creator_id),
       );
 
-      return rows
-        .map((row) => {
-          const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-          if (!profile) return null;
-          return toExploreCreator(profile, followedIds, {
-            badgeLabel: row.badge_label,
-            headline: row.headline,
-            sportKey: row.sport_key,
-          });
-        })
-        .filter((creator): creator is ExploreCreator => creator !== null);
+      return rows.map((row) => {
+        const profile = row.profile as { id: string; username?: string | null; name?: string | null; avatar_url?: string | null; bio?: string | null };
+        return {
+          id: profile.id, username: profile.username ?? null, name: profile.name || profile.username || 'Usuário',
+          avatarUrl: profile.avatar_url ?? null, bio: profile.bio ?? '', sports: [String(row.affinity_group_key ?? '')],
+          followerCount: Number(row.follower_count ?? 0), followedByMe: followedIds.has(profile.id), isProfessional: false,
+          ambassadorBadge: String(row.badge_label ?? ''), ambassadorHeadline: String(row.headline ?? ''),
+          ambassadorSport: String(row.affinity_group_key ?? ''),
+        } satisfies ExploreCreator;
+      });
     },
   });
 }
