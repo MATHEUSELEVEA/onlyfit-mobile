@@ -54,6 +54,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { AuthConfirmPage } from './pages/AuthConfirmPage';
 import { registerCapacitorAppBridge } from './lib/capacitorAppBridge';
 import { registerIosEdgeSwipeBack } from './lib/iosEdgeSwipeBack';
+import { AmbassadorNetworkPage } from './features/ambassadors/AmbassadorNetworkPage';
 
 // A rota /creator/:username é a mesma para todos os perfis; sem `key` o React
 // reaproveita a instância ao trocar de perfil e o estado (aba, folhas, dado
@@ -125,6 +126,7 @@ function AuthenticatedApp() {
           <Route path="/perfil/editar" element={<EditProfilePage />} />
           <Route path="/perfil/pagamentos" element={<PaymentsPage />} />
           <Route path="/perfil/financeiro" element={<FinancePage />} />
+          <Route path="/rede-embaixadores" element={<AmbassadorNetworkPage />} />
           <Route path="/perfil/atualizacoes" element={<NotificationsPage />} />
           <Route path="/perfil/visual" element={<VisualPreferencesPage />} />
           <Route path="/perfil/saude" element={<HealthProfilePage />} />
