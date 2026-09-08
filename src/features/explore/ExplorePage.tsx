@@ -39,15 +39,15 @@ import {
   type ExploreChallenge,
 } from './useExplore';
 
-// O Explorar é para descobrir de graça: conteúdo gratuito primeiro, depois
-// pessoas, desafios e comunidades. Produto é venda e vive na aba Produtos.
+// O Explorar é para descobrir de graça. Pessoas permanece no último slot para
+// manter paridade com os clientes oficiais durante a transição do legado.
 type ExploreTab = 'content' | 'people' | 'challenges' | 'communities';
 
 const TABS: { key: ExploreTab; label: string }[] = [
   { key: 'content', label: 'Conteúdo' },
-  { key: 'people', label: 'Pessoas' },
   { key: 'challenges', label: 'Desafios' },
   { key: 'communities', label: 'Comunidades' },
+  { key: 'people', label: 'Pessoas' },
 ];
 
 function isExploreTab(value: string | null): value is ExploreTab {
