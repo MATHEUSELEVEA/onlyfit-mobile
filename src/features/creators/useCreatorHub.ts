@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { offeringPresentationName } from '@/lib/offeringPresentation';
 import { normalizeSocialLinks, type SocialLinks } from '@/lib/socialLinks';
 
 // Dados do perfil público e das abas do hub do criador. Tudo somente leitura:
@@ -99,7 +100,7 @@ export function useCreatorPremiumOffering(creatorId: string | null | undefined) 
       if (!data || data.billing_type !== 'recurring' || data.price == null) return null;
       return {
         id: data.id,
-        name: data.name ?? 'Assinatura premium',
+        name: offeringPresentationName('premium_content', data.name),
         price: Number(data.price),
         currency: data.currency ?? 'BRL',
         billingType: 'recurring',

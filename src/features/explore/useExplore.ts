@@ -190,8 +190,20 @@ export function useExploreContent() {
     queryKey: ['explore-content'],
     staleTime: 2 * 60_000,
     queryFn: async (): Promise<ExploreContentItem[]> => {
-      const { data, error } = await supabase
-        .from('posts')
+      const ranked = await supabase.rpc('list_discover_content_v1' as never, {
+        p_sports: null,
+        p_limit: 24,
+      } as never);
+      let rankedIds: string[] | null = null;
+      if (!ranked.error) {
+        rankedIds = ((ranked.data ?? []) as { post_id: string }[]).map((row) => row.post_id);
+        if (rankedIds.length === 0) return [];
+      } else if (!['PGRST202', '42883'].includes(ranked.error.code ?? '')) {
+        throw ranked.error;
+      }
+
+      let query = supabase
+        .from('visible_posts')
         .select(
           `id, title, thumbnail_url, video_url, likes, sports, creator_id,
            profiles:creator_id!inner (full_name, username)`,
@@ -200,11 +212,15 @@ export function useExploreContent() {
         // `not is true` (e não `eq false`) porque is_premium é nullable no
         // schema do v1: nulo é conteúdo gratuito antigo e precisa entrar.
         .not('is_premium', 'is', true)
-        .order('published_at', { ascending: false })
-        .limit(24);
+        .not('published_at', 'is', null)
+        .lte('published_at', new Date().toISOString());
+      query = rankedIds
+        ? query.in('id', rankedIds)
+        : query.order('published_at', { ascending: false }).limit(24);
+      const { data, error } = await query;
       if (error) throw error;
 
-      return ((data ?? []) as unknown as ContentRow[]).map((row) => {
+      const items = ((data ?? []) as unknown as ContentRow[]).map((row) => {
         const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
         return {
           id: row.id,
@@ -219,6 +235,9 @@ export function useExploreContent() {
           sports: row.sports ?? [],
         };
       });
+      if (!rankedIds) return items;
+      const order = new Map(rankedIds.map((id, index) => [id, index]));
+      return items.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
     },
   });
 }
